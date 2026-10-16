@@ -12,8 +12,12 @@ storage.
 
 ### 1.1 In scope for v1
 
-1. **Generate songs** with any music provider that has an adapter. v1 ships the kie.ai adapter (Suno models).
-   Music APIs have no common standard, so each one needs its own small adapter class (§3.2).
+1. **Generate songs** with any music provider that has an adapter. Music APIs have no common standard, so
+   each one needs its own small adapter class (§3.2). v1 ships three adapters:
+   - `kie`: kie.ai (Suno models).
+   - `suno_classic`: sunoapi.org and other resellers that use the classic Suno API shape. The user can change
+     the base URL.
+   - `elevenlabs`: ElevenLabs Music (paid ElevenLabs plans only).
 2. **Lyric and prompt helper.** A text model writes or improves lyrics, a style, and a title. The adapter is
    OpenAI-compatible, so it works with any provider that has that API: OpenRouter, OpenAI, Groq, Together,
    DeepSeek, kie.ai chat models, and others. The user enters only a base URL, a key, and a model.
@@ -26,15 +30,19 @@ storage.
 - Public song pages, sharing, likes, and comments.
 - Payments, plans, and teams.
 - Streamed lyric output (the helper returns the full result in one response).
-- Music adapters other than kie.ai. The `MusicProvider` interface supports them, so each one is one new class
-  after v1.
+- More music adapters. The `MusicProvider` interface supports them, so each one is one new class after v1.
+- Suno's official API. In 2026-10 it is invite-only with no public docs. Add a `suno` adapter when Suno
+  publishes it.
+- Unofficial Suno wrappers that copy Suno's private app API. They break Suno's terms of service.
+- ElevenLabs composition plans. v1 sends a text prompt only.
 - A "generic HTTP" music adapter where users map JSON fields by hand. It breaks easily and is hard to secure.
 - Provider endpoints on a private network, for example a local Ollama server (see §7.3).
 
 ### 1.3 Success criteria
 
-- A new user can sign up, add a kie.ai key, and play a generated song in less than 5 minutes.
-- A song still plays 30 days after generation (kie.ai deletes its files after 14 days).
+- A new user can sign up, add a music provider key, and play a generated song in less than 5 minutes.
+- A song still plays 30 days after generation (kie.ai and sunoapi.org delete their files after 14 days).
+- If the server restarts during a paid direct call (ElevenLabs), the API does not repeat the call.
 - No API path returns a stored provider key, and no log line contains one.
 - A lost provider callback, or a provider without callbacks, does not leave a generation stuck. The fallback poll completes it or marks it
   failed within 30 minutes.
@@ -118,7 +126,7 @@ The web app needs only `API_ORIGIN` (`https://minstrel-api.<name>.to`) for the r
 | Auth | `apps/api/src/auth` | Better Auth instance and `@thallesp/nestjs-better-auth` module with a global guard |
 | Crypto | `apps/api/src/crypto` | `KeyVault`: encrypt and decrypt provider keys |
 | Network guard | `apps/api/src/net` | `safeFetch`: outbound HTTPS with private-address blocks |
-| Providers | `apps/api/src/providers` | `MusicProvider` and `TextProvider` interfaces, `KieMusicProvider`, `OpenAiCompatibleTextProvider`, and a registry |
+| Providers | `apps/api/src/providers` | `MusicProvider` and `TextProvider` interfaces, `KieMusicProvider`, `SunoClassicMusicProvider`, `ElevenLabsMusicProvider`, `OpenAiCompatibleTextProvider`, and a registry |
 | Connections | `apps/api/src/connections` | CRUD and "test connection" for provider keys |
 | Assist | `apps/api/src/assist` | The lyric and prompt helper |
 | Generations | `apps/api/src/generations` | Submit, webhook, sync, and the fallback poller |
@@ -131,13 +139,41 @@ Each unit depends on interfaces, not on other units' internals. Tests replace `M
 
 ### 3.2 Provider interfaces
 
+Music APIs use one of two flows, so `MusicProvider` is a union of two shapes:
+
 ```ts
-interface MusicProvider {
-  readonly supportsCallback: boolean;                                          // false: the poller does all syncs
-  submit(conn: DecryptedConnection, input: GenerationInput, callbackUrl?: string): Promise<{ taskId: string }>;
-  getTask(conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult>; // state + tracks
-  checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck>;        // for example, credits
+interface MusicProviderBase {
+  readonly adapter: MusicAdapter;                  // 'kie' | 'suno_classic' | 'elevenlabs'
+  readonly displayName: string;                    // "kie.ai", "Suno-compatible", "ElevenLabs Music"
+  readonly defaultBaseUrl: string;
+  readonly capabilities: MusicCapabilities;        // which form fields apply, limits, tracks per request
+  readonly inputSchema: ZodType<GenerationInput>;  // this adapter's limits, from packages/shared
+  checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck>;
   listModels(): ModelOption[];
+}
+
+// Job flow: submit, then a callback and/or a status poll (kie, suno_classic)
+interface JobMusicProvider extends MusicProviderBase {
+  readonly flow: 'job';
+  readonly supportsCallback: boolean;
+  submit(conn: DecryptedConnection, input: GenerationInput, callbackUrl?: string): Promise<{ taskId: string }>;
+  getTask(conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult>; // state + tracks with URLs
+}
+
+// Direct flow: one call returns the audio (elevenlabs)
+interface DirectMusicProvider extends MusicProviderBase {
+  readonly flow: 'direct';
+  compose(conn: DecryptedConnection, input: GenerationInput, signal: AbortSignal): Promise<DirectTrack[]>;
+}
+
+type MusicProvider = JobMusicProvider | DirectMusicProvider;
+
+interface DirectTrack { body: ReadableStream<Uint8Array>; contentType: string; durationSeconds?: number }
+
+interface MusicCapabilities {
+  lyrics: boolean; style: boolean; providerTitle: boolean; instrumental: boolean;
+  lengthSeconds: { min: number; max: number } | null;   // null: the provider picks the length
+  tracksPerRequest: number;
 }
 
 interface TextProvider {
@@ -147,8 +183,13 @@ interface TextProvider {
 }
 ```
 
-The registry maps `adapter` (`kie`, `openai_compatible`) to an implementation. To support a new provider,
-add one class and one registry entry.
+`GenerationInput` is one shared shape for all adapters: `idea`, `lyrics`, `style`, `title`, `instrumental`,
+`model`, and `lengthSeconds`. Each adapter maps it to its own API, and its `inputSchema` applies its limits.
+The Studio form shows only the fields in `capabilities`. A `title` is always stored in Minstrel, even when the
+provider has no title field.
+
+The registry maps `adapter` (`kie`, `suno_classic`, `elevenlabs`, `openai_compatible`) to an implementation.
+To support a new provider, add one class and one registry entry.
 
 - **Text:** one adapter, `openai_compatible`, covers all providers with that API. A new text provider needs
   no code.
@@ -156,8 +197,8 @@ add one class and one registry entry.
   needs one `MusicProvider` class, one `adapter` enum value, and tests with fixtures from its docs. The rest
   of the app (generations, tracks, storage, and UI) does not change.
 - The UI lists the music adapters from the registry, so a new adapter appears in Settings without UI work.
-- The webhook route is `/api/webhooks/:adapter/:generationId`. A provider without callbacks
-  (`supportsCallback = false`) uses only the poller.
+- The webhook route is `/api/webhooks/:adapter/:generationId`. A job provider without callbacks
+  (`supportsCallback = false`) uses only the poller. A direct provider never uses the webhook.
 
 ### 3.3 Libraries
 
@@ -189,7 +230,7 @@ Better Auth CLI. Do not edit them by hand.
 | `id` | uuid PK | |
 | `user_id` | FK → `user.id` | Cascade delete |
 | `kind` | enum `music`, `text` | |
-| `adapter` | enum `kie`, `openai_compatible` | |
+| `adapter` | enum `kie`, `suno_classic`, `elevenlabs`, `openai_compatible` | `kind` must match the adapter |
 | `label` | text | Unique per user |
 | `base_url` | text | Adapter default. The user can change it. HTTPS only. |
 | `key_ciphertext`, `key_iv`, `key_tag` | bytea | AES-256-GCM |
@@ -207,8 +248,10 @@ Better Auth CLI. Do not edit them by hand.
 | `id` | uuid PK | |
 | `user_id` | FK → `user.id` | Cascade delete |
 | `connection_id` | FK → `provider_connections.id` | Set null on delete |
-| `provider_task_id` | text null | Unique with `connection_id` |
-| `callback_token_hash` | bytea | SHA-256 of the callback token |
+| `adapter` | enum | Copied from the connection at submit, so the row stays readable after a delete |
+| `flow` | enum `job`, `direct` | |
+| `provider_task_id` | text null | Job flow only. Unique with `connection_id`. |
+| `callback_token_hash` | bytea null | Job flow with callbacks only. SHA-256 of the callback token. |
 | `status` | enum | See §5.2 |
 | `input` | jsonb | Validated `GenerationInput` |
 | `error_code`, `error_message` | text null | |
@@ -244,42 +287,59 @@ user returns `404`, not `403`, so that IDs do not leak.
 
 ## 5. Song generation
 
-### 5.1 kie.ai facts (from docs.kie.ai, 2026-10-16)
+### 5.1 Provider facts (from each provider's docs, 2026-10-16)
 
-- Submit: `POST https://api.kie.ai/api/v1/jobs/createTask`, header `Authorization: Bearer <key>`.
-- Status: `GET /api/v1/jobs/recordInfo?taskId=...`. States: `waiting`, `queuing`, `generating`, `success`,
-  `fail`.
-- Callbacks go to `callBackUrl` in three stages: `text`, `first`, `complete`.
-- Models: `V6`, `V6_MINI`, `V6_WILD`. Earlier models are discontinued.
-- Limits: `title` 80 characters. `style` 1000. `lyrics` 5000. `prompt` 3000 in non-custom mode.
-- Files stay on kie.ai for 14 days.
-- The webhook HMAC signs `taskId.timestamp` only, not the body. kie.ai tells clients to read the
-  authoritative result from `recordInfo`.
+| Fact | `kie` (kie.ai) | `suno_classic` (sunoapi.org) | `elevenlabs` (ElevenLabs Music) |
+|---|---|---|---|
+| Flow | job | job | direct |
+| Default base URL | `https://api.kie.ai` | `https://apibox.erweima.ai` | `https://api.elevenlabs.io` |
+| Auth header | `Authorization: Bearer <key>` | `Authorization: Bearer <key>` | `xi-api-key: <key>` |
+| Submit | `POST /api/v1/jobs/createTask`, snake_case fields (`custom_mode`, `callBackUrl`) | `POST /api/v1/generate`, camelCase fields (`customMode`, `callBackUrl`) | `POST /v1/music` with `prompt`, `model_id`, `music_length_ms`, `force_instrumental` |
+| Status | `GET /api/v1/jobs/recordInfo?taskId=` | `GET /api/v1/generate/record-info?taskId=` | — (the response is the audio file) |
+| States | `waiting`, `queuing`, `generating`, `success`, `fail` | `PENDING`, `TEXT_SUCCESS`, `FIRST_SUCCESS`, `SUCCESS`, `CREATE_TASK_FAILED`, `GENERATE_AUDIO_FAILED`, `SENSITIVE_WORD_ERROR` | — |
+| Callback stages | `text`, `first`, `complete` | `text`, `first`, `complete` | none |
+| Models | `V6`, `V6_MINI`, `V6_WILD` | `V6`, `V6_MINI`, `V6_WILD` | `music_v1`, `music_v2`, `music_v2_5` |
+| Limits | title 80, style 1000, lyrics 5000, idea 3000, length 10–360 s | the same as `kie` | length 3–600 s |
+| Tracks per request | 2 | 2 | 1 |
+| Files kept by provider | 14 days | 14 days | not applicable (Minstrel stores the response) |
+| Lyrics | own field | own field | inside `prompt`; with no lyrics, the model writes them |
+| Instrumental | `instrumental: true` | `instrumental: true` | `force_instrumental: true` |
+
+Other facts:
+
+- Only paid ElevenLabs plans can use the Music API.
+- The kie.ai webhook HMAC signs `taskId.timestamp` only, not the body. Both Suno providers tell clients to
+  read the authoritative result from the status endpoint.
+- Earlier Suno models (`V4` to `V5_5`) are discontinued. Minstrel does not offer them.
+
+The ElevenLabs adapter builds `prompt` from the form in this order: the style, the idea, then
+`Lyrics:` and the lyrics. When `instrumental` is true, it sets `force_instrumental` and sends no lyrics.
 
 ### 5.2 Generation states
 
 ```
-submitting ──► pending ──► text_ready ──► first_ready ──► complete
-     │            │             │               │
-     └────────────┴─────────────┴───────────────┴──► failed
+job flow:     submitting ──► pending ──► text_ready ──► first_ready ──► complete
+direct flow:  queued ──► running ──► complete
+              any state that is not complete ──► failed
 ```
 
 The sync step can skip states. For example, `pending` can go directly to `complete`.
 
-### 5.3 Flow
+### 5.3 Job flow (`kie`, `suno_classic`)
 
 1. **Submit.** `POST /api/generations` with `connectionId` and `input`.
-   1. The Zod schema checks the model limits from §5.1.
-   2. The API makes a 32-byte random callback token and stores its SHA-256 hash.
-   3. The API inserts the generation with status `submitting`.
-   4. `KeyVault` decrypts the key. `KieMusicProvider.submit()` sends the task with
-      `callBackUrl = ${PUBLIC_API_URL}/api/webhooks/kie/<generationId>?t=<token>`.
+   1. The adapter's `inputSchema` checks the limits from §5.1.
+   2. When `supportsCallback` is true, the API makes a 32-byte random callback token and stores its
+      SHA-256 hash.
+   3. The API inserts the generation with status `submitting`, `flow = job`, and the adapter.
+   4. `KeyVault` decrypts the key. `submit()` sends the task with
+      `callBackUrl = ${PUBLIC_API_URL}/api/webhooks/<adapter>/<generationId>?t=<token>`.
    5. On success: the API saves `provider_task_id`, sets `pending`, and sets `next_poll_at = now + 30 s`.
    6. On failure: the API sets `failed` with a mapped error (§8).
    7. The response is the generation, with `202 Accepted`.
-2. **Callback.** `POST /api/webhooks/kie/:generationId?t=<token>` is public (`@AllowAnonymous`).
-   1. The API compares the token hash with `crypto.timingSafeEqual`. A mismatch or an unknown ID returns
-      `404`.
+2. **Callback.** `POST /api/webhooks/:adapter/:generationId?t=<token>` is public (`@AllowAnonymous`).
+   1. The API compares the token hash with `crypto.timingSafeEqual`. A mismatch, an unknown ID, or an
+      adapter that does not match the row returns `404`.
    2. The API ignores the request body.
    3. The API replies `200` at once, then runs `sync(generationId)` in the background.
 3. **Sync.** `sync(generationId)` first claims the row with one statement:
@@ -288,30 +348,58 @@ The sync step can skip states. For example, `pending` can go directly to `comple
    claim, and this call stops. A callback and the poller can never sync the same row at the same time.
    The provider call happens outside any database transaction, so a slow provider never holds a lock.
    1. When the connection no longer exists, the generation goes to `failed` with `connection_removed`.
-   2. `getTask()` reads `recordInfo` with the user's key.
+   2. `getTask()` reads the status endpoint with the user's key.
    3. In one short transaction, the API saves the mapped state, upserts each returned track on
       `(generation_id, provider_track_id)`, and clears `lease_until`.
-   4. Each new track starts the copy to R2 (§5.4).
-4. **Fallback poller.** `@nestjs/schedule` runs every 30 seconds. It selects up to 20 generations in
+   4. Each new track starts the copy to R2 (§5.5).
+4. **Fallback poller.** `@nestjs/schedule` runs every 30 seconds. It selects up to 20 job generations in
    `pending`, `text_ready`, or `first_ready` where `next_poll_at <= now()`, and syncs each one.
    - Backoff: 30 s, 60 s, 120 s, then 300 s.
    - After 30 minutes from submit, the generation goes to `failed` with `provider_timeout`.
    - The same job retries tracks in `pending` or `copy_failed` with fewer than 5 attempts.
-5. **Live status in the browser.** The Studio page polls `GET /api/generations/:id` every 3 seconds while
-   the status is not `complete` or `failed`. Polling works through the Vercel rewrite. Server-sent events
-   may get buffered there, so v1 does not use them.
 
-### 5.4 Copy to R2
+### 5.4 Direct flow (`elevenlabs`)
+
+A direct call can take minutes, and the Vercel rewrite must not wait for it. The API runs it in the
+background.
+
+1. **Submit.** `POST /api/generations` checks the input, inserts the generation with status `queued` and
+   `flow = direct`, and returns `202 Accepted` at once. Then it starts `runDirect(generationId)` in the
+   background.
+2. **Run.** `runDirect` claims the row with the same lease statement as §5.3, with a lease of 15 minutes,
+   and sets `running`.
+   1. `compose()` calls the provider with an `AbortSignal` that stops the call after 12 minutes.
+   2. The response body streams straight into R2 (§5.5). It never sits in memory as one buffer.
+   3. On success: one transaction inserts the track with `storage_status = stored` and sets `complete`.
+   4. On failure: the API sets `failed` with a mapped error (§8).
+3. **No automatic retry.** Each direct call costs the user money. When the poller finds a `running`
+   generation with an expired lease (for example, after a server restart), it sets `failed` with
+   `interrupted`. It never calls the provider again. The user can press "Make song" again.
+4. **Queue limit.** Each API process runs at most 4 direct calls at once. The poller starts `queued`
+   generations in creation order when a place is free. A `queued` row costs nothing, so the poller can
+   start it safely after a restart.
+
+### 5.5 Live status and copy to R2
+
+**Live status.** The Studio page polls `GET /api/generations/:id` every 3 seconds while the status is not
+`complete` or `failed`. Polling works through the Vercel rewrite. Server-sent events may get buffered there,
+so v1 does not use them.
+
+**Copy to R2 (job flow).**
 
 1. `safeFetch` downloads the provider audio URL as a stream (§7.3).
-2. `@aws-sdk/lib-storage` `Upload` streams it to `users/<userId>/tracks/<trackId>.mp3`. The object keeps
+2. `@aws-sdk/lib-storage` `Upload` streams it to `users/<userId>/tracks/<trackId>.<ext>`. The object keeps
    the provider's `Content-Type` when it starts with `audio/`. Any other type becomes `audio/mpeg`. The
-   cover image goes to `.jpg` the same way, and its type must start with `image/`.
+   extension follows the type (`mp3`, `wav`, or `m4a`). The cover image goes to `.jpg` the same way, and its
+   type must start with `image/`.
 3. The size limit is 50 MB for audio and 5 MB for a cover. The copy stops when a file is larger.
 4. On success: `storage_status = stored`, and the provider URLs become null.
 5. On failure: `storage_status = copy_failed`, and `copy_attempts` goes up by one. The poller retries.
-6. Before the copy finishes, the player uses `provider_audio_url` (kie.ai `stream_audio_url`). The user can
+6. Before the copy finishes, the player uses `provider_audio_url` (the provider's stream URL). The user can
    play the first take before the copy is done.
+
+**Direct flow.** The provider response streams into R2 with the same type, extension, and size rules. A
+direct track has no provider URL and no cover image. The UI shows a generated pattern in place of a cover.
 
 ## 6. Lyric and prompt helper
 
@@ -386,19 +474,22 @@ The API returns `{ code, message }`. The UI shows `message` as it is.
 
 | Source | Code | Message in the UI |
 |---|---|---|
-| Provider 401 | `invalid_key` | "kie.ai did not accept this key. Check the key in Settings → Connections." |
-| Provider 402 or no credits | `insufficient_credits` | "Your kie.ai account has no credits left. Add credits on kie.ai, then try again." |
-| Provider 429 | `provider_rate_limited` | "kie.ai is busy. Wait a minute, then try again." |
-| Provider 400 or 422 | `provider_rejected` | "kie.ai did not accept this request: <provider reason>." |
-| Provider 5xx or timeout | `provider_unavailable` | "kie.ai did not answer. Try again in a few minutes." |
-| Task state `fail` | `generation_failed` | "kie.ai could not make this song: <provider reason>." |
-| Poll limit reached | `provider_timeout` | "kie.ai did not finish this song in 30 minutes." |
+| Provider 401 | `invalid_key` | "<Provider> did not accept this key. Check the key in Settings → Connections." |
+| Provider 402, or no credits | `insufficient_credits` | "Your <Provider> account has no credits left. Add credits with <Provider>, then try again." |
+| ElevenLabs 401 or 403 on `/v1/music` for a key that passed the test | `plan_required` | "ElevenLabs Music needs a paid ElevenLabs plan." |
+| Provider 429 | `provider_rate_limited` | "<Provider> is busy. Wait a minute, then try again." |
+| Provider 400 or 422 | `provider_rejected` | "<Provider> did not accept this request: <provider reason>." |
+| Provider 5xx or timeout | `provider_unavailable` | "<Provider> did not answer. Try again in a few minutes." |
+| Task failed (`fail`, `CREATE_TASK_FAILED`, `GENERATE_AUDIO_FAILED`) | `generation_failed` | "<Provider> could not make this song: <provider reason>." |
+| `SENSITIVE_WORD_ERROR` | `content_rejected` | "<Provider> did not accept some words in the lyrics or the style. Change them, then try again." |
+| Poll limit reached | `provider_timeout` | "<Provider> did not finish this song in 30 minutes." |
+| Direct call stopped by a restart | `interrupted` | "The server restarted while <Provider> made this song. Minstrel did not send the request again, so you were not charged twice. Press Make song to try again." |
 | Connection deleted during a generation | `connection_removed` | "You removed the key for this song before it finished. Add a key, then make the song again." |
 | Zod failure | `invalid_input` | The field-level messages |
 | Our rate limit | `rate_limited` | "You sent too many requests. Wait a minute, then try again." |
 
-The UI uses the provider label (for example, "kie.ai" or "OpenRouter") from the connection, not a fixed
-name. Unexpected errors return `500` with `internal_error`. The log keeps the details.
+`<Provider>` is the connection label that the user chose, for example "kie.ai", "My sunoapi", or
+"ElevenLabs". Unexpected errors return `500` with `internal_error`. The log keeps the details.
 
 ## 9. API surface
 
@@ -415,11 +506,12 @@ Request and response schemas live in `packages/shared`.
 | `DELETE /api/connections/:id` | Delete a connection |
 | `POST /api/connections/:id/test` | Check the key with the provider |
 | `GET /api/connections/:id/models` | List models |
+| `GET /api/providers` | List the adapters, their display names, default base URLs, and capabilities |
 | `POST /api/assist` | Lyric and prompt helper |
 | `POST /api/generations` | Submit a song request |
 | `GET /api/generations` | List generations, cursor pages of 20 |
 | `GET /api/generations/:id` | One generation and its tracks |
-| `POST /api/webhooks/:adapter/:generationId` | Music provider callback (public, token). kie.ai uses `adapter = kie`. |
+| `POST /api/webhooks/:adapter/:generationId` | Job-flow music provider callback (public, token). For example, `adapter = kie`. |
 | `GET /api/tracks` | Library, cursor pages of 50, newest first |
 | `PATCH /api/tracks/:id` | Rename |
 | `DELETE /api/tracks/:id` | Delete the row and the R2 objects |
@@ -440,7 +532,8 @@ Request and response schemas live in `packages/shared`.
 | `/settings/account` | Email, password, and account deletion |
 
 A first-time user with no music connection sees `/settings/connections` with one instruction:
-"Add a kie.ai key to make songs." This empty state replaces a separate onboarding flow.
+"Add a music provider key to make songs." The page lists kie.ai, Suno-compatible, and ElevenLabs Music,
+each with a link to the page where the user gets a key. This empty state replaces a separate onboarding flow.
 
 The player bar is fixed at the bottom of every signed-in page. One `<audio>` element lives in a React
 context, so playback continues across page changes. The Media Session API gives lock-screen controls.
@@ -514,12 +607,17 @@ Studio, wide screen. The form is left-aligned. Text never centers, except in the
 │ └────────────────────────────────────┘ │                            │
 │ Style [ shanty, accordion ] [Suggest]  │                            │
 │ Title [                   ] [Suggest]  │                            │
-│ Model [V6 ▾]  Instrumental [ ]         │                            │
+│ Provider [kie.ai ▾] Model [V6 ▾]       │
+│ Instrumental [ ]                       │                            │
 │                          [ Make song ] │                            │
 ├───────────────────────────────────────┴────────────────────────────┤
 │ ▶  The Cat Who Sailed    ━━━━━━━━━━━━━━━━──────────  1:12 / 2:41   │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+The form shows only the fields in the adapter's `capabilities`. For example, ElevenLabs shows a length
+control and keeps the title in Minstrel only. When the user changes the provider, the values in hidden fields
+stay in the form, so nothing typed is lost.
 
 On a phone, the "Takes" column moves below the form, and the player bar stays at the bottom.
 
@@ -565,15 +663,17 @@ Test limits on the owner's laptop: one test file at a time, `--maxWorkers=1`,
 |---|---|---|
 | Unit | `KeyVault`: round trip, wrong AAD fails, changed byte fails, old version decrypts | Vitest |
 | Unit | `safeFetch`: each blocked range, DNS rebinding, redirect to a private IP | Vitest |
-| Unit | kie.ai adapter: request body and state mapping, with fixtures from the docs | Vitest |
+| Unit | Each music adapter (`kie`, `suno_classic`, `elevenlabs`): request body, auth header, state mapping, and error mapping, with fixtures from its docs | Vitest |
+| Unit | ElevenLabs prompt builder: style, idea, and lyrics order; instrumental sends no lyrics | Vitest |
 | Unit | Generation state transitions and backoff times | Vitest |
 | Unit | Webhook token check: right token, wrong token, unknown ID | Vitest |
 | Unit | Shared Zod schemas: each model limit | Vitest |
-| Integration | Submit → callback → sync → tracks stored, with a fake `MusicProvider` and a fake `AudioStore`, on a real Postgres | Vitest + Docker Postgres |
+| Integration | Job flow: submit → callback → sync → tracks stored, with a fake `JobMusicProvider` and a fake `AudioStore`, on a real Postgres | Vitest + Docker Postgres |
+| Integration | Direct flow: submit → run → stored; an expired `running` lease becomes `interrupted` and the fake provider gets no second call; the queue limit of 4 | Vitest + Docker Postgres |
 | Integration | Ownership: user B gets `404` for each route that takes user A's ID | Vitest + Supertest |
 | Web | Form checks and the helper fill-in | Vitest + Testing Library |
 | End to end | Sign up → add a fake connection → make a song → play it | Playwright, one test |
-| Manual | One real kie.ai song on the production setup before launch | — |
+| Manual | One real song with each of the three adapters on the production setup before launch | — |
 
 ## 12. Build order
 
@@ -584,7 +684,9 @@ Each milestone ends with working, tested code.
 2. **Connections.** `KeyVault`, `safeFetch`, the provider registry, the connection routes, and the
    Settings page.
 3. **Helper.** `OpenAiCompatibleTextProvider`, `/api/assist`, and the Studio form with helper buttons.
-4. **Generation.** `KieMusicProvider`, submit, webhook, sync, the poller, and the "Takes" panel.
+4. **Job flow.** `KieMusicProvider`, submit, webhook, sync, the poller, and the "Takes" panel.
 5. **Storage and library.** R2 copy, the library page, the player bar, rename, delete, and download.
-6. **Deployment.** API Dockerfile, Dokploy services, Cloudflare Tunnel, backups, Vercel project, and the
+6. **More adapters.** `SunoClassicMusicProvider` (job flow), then `ElevenLabsMusicProvider` with the direct
+   flow runner (§5.4).
+7. **Deployment.** API Dockerfile, Dokploy services, Cloudflare Tunnel, backups, Vercel project, and the
    pre-launch checks in §7.4 and §11.
