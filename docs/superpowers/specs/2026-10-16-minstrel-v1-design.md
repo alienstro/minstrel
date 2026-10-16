@@ -12,9 +12,11 @@ storage.
 
 ### 1.1 In scope for v1
 
-1. **Generate songs** with a music provider. The first adapter is kie.ai (Suno models).
+1. **Generate songs** with any music provider that has an adapter. v1 ships the kie.ai adapter (Suno models).
+   Music APIs have no common standard, so each one needs its own small adapter class (§3.2).
 2. **Lyric and prompt helper.** A text model writes or improves lyrics, a style, and a title. The adapter is
-   OpenAI-compatible, so it works with OpenRouter, OpenAI, Groq, kie.ai chat models, and other compatible APIs.
+   OpenAI-compatible, so it works with any provider that has that API: OpenRouter, OpenAI, Groq, Together,
+   DeepSeek, kie.ai chat models, and others. The user enters only a base URL, a key, and a model.
 3. **Library and player.** The user plays, renames, downloads, and deletes their songs.
 4. **Accounts.** Sign-in, provider keys, and account deletion.
 
@@ -24,7 +26,9 @@ storage.
 - Public song pages, sharing, likes, and comments.
 - Payments, plans, and teams.
 - Streamed lyric output (the helper returns the full result in one response).
-- Music adapters other than kie.ai.
+- Music adapters other than kie.ai. The `MusicProvider` interface supports them, so each one is one new class
+  after v1.
+- A "generic HTTP" music adapter where users map JSON fields by hand. It breaks easily and is hard to secure.
 - Provider endpoints on a private network, for example a local Ollama server (see §7.3).
 
 ### 1.3 Success criteria
@@ -32,7 +36,7 @@ storage.
 - A new user can sign up, add a kie.ai key, and play a generated song in less than 5 minutes.
 - A song still plays 30 days after generation (kie.ai deletes its files after 14 days).
 - No API path returns a stored provider key, and no log line contains one.
-- A lost kie.ai callback does not leave a generation stuck. The fallback poll completes it or marks it
+- A lost provider callback, or a provider without callbacks, does not leave a generation stuck. The fallback poll completes it or marks it
   failed within 30 minutes.
 
 ## 2. Infrastructure
@@ -57,9 +61,9 @@ payments or shows ads.
 ```
 Browser ──► minstrel.<name>.to/*        Vercel: Next.js pages
 Browser ──► minstrel.<name>.to/api/*    Vercel rewrite ──► minstrel-api.<name>.to/api/*
-kie.ai  ──► minstrel-api.<name>.to/api/webhooks/kie/*
+Music provider ──► minstrel-api.<name>.to/api/webhooks/<adapter>/*   (only providers with callbacks)
 minstrel-api ──► Cloudflare ══ tunnel ══► cloudflared ──► Traefik (Dokploy) ──► api container ──► postgres
-api container ──► kie.ai, OpenRouter, other providers, Cloudflare R2   (outbound)
+api container ──► music and text providers (kie.ai, OpenRouter, any other), Cloudflare R2   (outbound)
 Browser ──► R2 signed URL                 audio stream and download
 ```
 
@@ -94,7 +98,7 @@ Rules:
 |---|---|
 | `DATABASE_URL` | Connection string for `minstrel-db` |
 | `WEB_ORIGIN` | `https://minstrel.<name>.to`. Better Auth `baseURL` and trusted origin. |
-| `PUBLIC_API_URL` | `https://minstrel-api.<name>.to`. Base of the kie.ai callback URLs. |
+| `PUBLIC_API_URL` | `https://minstrel-api.<name>.to`. Base of the provider callback URLs. |
 | `BETTER_AUTH_SECRET` | Better Auth signing secret, 32+ random bytes |
 | `KEY_ENCRYPTION_KEYS` | Master keys for provider keys, for example `1:<base64 32 bytes>`. The highest version encrypts. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in |
@@ -129,7 +133,8 @@ Each unit depends on interfaces, not on other units' internals. Tests replace `M
 
 ```ts
 interface MusicProvider {
-  submit(conn: DecryptedConnection, input: GenerationInput, callbackUrl: string): Promise<{ taskId: string }>;
+  readonly supportsCallback: boolean;                                          // false: the poller does all syncs
+  submit(conn: DecryptedConnection, input: GenerationInput, callbackUrl?: string): Promise<{ taskId: string }>;
   getTask(conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult>; // state + tracks
   checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck>;        // for example, credits
   listModels(): ModelOption[];
@@ -144,6 +149,15 @@ interface TextProvider {
 
 The registry maps `adapter` (`kie`, `openai_compatible`) to an implementation. To support a new provider,
 add one class and one registry entry.
+
+- **Text:** one adapter, `openai_compatible`, covers all providers with that API. A new text provider needs
+  no code.
+- **Music:** each music API has its own request fields, job flow, and result shape. A new music provider
+  needs one `MusicProvider` class, one `adapter` enum value, and tests with fixtures from its docs. The rest
+  of the app (generations, tracks, storage, and UI) does not change.
+- The UI lists the music adapters from the registry, so a new adapter appears in Settings without UI work.
+- The webhook route is `/api/webhooks/:adapter/:generationId`. A provider without callbacks
+  (`supportsCallback = false`) uses only the poller.
 
 ### 3.3 Libraries
 
@@ -330,7 +344,7 @@ The sync step can skip states. For example, `pending` can go directly to `comple
 - Sign-in methods: email + password with email verification, and Google.
 - Resend sends the verification and password reset emails.
 - The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and host-only.
-- The module guard protects every route. Only `/api/auth/*`, `/api/health`, and `/api/webhooks/kie/*` are
+- The module guard protects every route. Only `/api/auth/*`, `/api/health`, and `/api/webhooks/*` are
   public.
 - Account deletion uses Better Auth `deleteUser`. A hook first deletes all R2 objects under
   `users/<userId>/`. The database cascades remove the user's rows.
@@ -405,7 +419,7 @@ Request and response schemas live in `packages/shared`.
 | `POST /api/generations` | Submit a song request |
 | `GET /api/generations` | List generations, cursor pages of 20 |
 | `GET /api/generations/:id` | One generation and its tracks |
-| `POST /api/webhooks/kie/:generationId` | kie.ai callback (public, token) |
+| `POST /api/webhooks/:adapter/:generationId` | Music provider callback (public, token). kie.ai uses `adapter = kie`. |
 | `GET /api/tracks` | Library, cursor pages of 50, newest first |
 | `PATCH /api/tracks/:id` | Rename |
 | `DELETE /api/tracks/:id` | Delete the row and the R2 objects |
