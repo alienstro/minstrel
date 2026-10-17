@@ -20,6 +20,7 @@ import { DB, DbModule, type Db } from './db/db.module.js';
 import { GenerationsModule } from './generations/generations.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
 import { StorageModule } from './storage/storage.module.js';
+import { TracksModule } from './tracks/tracks.module.js';
 
 const mailerProvider = {
   provide: MAILER,
@@ -57,6 +58,7 @@ class MailerModule {}
     StorageModule,
     ConnectionsModule,
     GenerationsModule,
+    TracksModule,
     // Each limited route sets its own limit with @Throttle (spec §7.4). The default is only a fallback.
     ThrottlerModule.forRootAsync({
       inject: [DB],

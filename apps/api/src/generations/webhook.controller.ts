@@ -1,14 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
 import { Controller, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
-import { z } from 'zod';
 import { notFound } from '../common/api-error.js';
+import { isUuid } from '../common/is-uuid.js';
 import { BackgroundWork } from '../common/background-work.js';
 import { GenerationsRepo } from './generations.repo.js';
 import { hashToken } from './generations.service.js';
 import { SyncService } from './sync.service.js';
-
-const isUuid = (value: string) => z.uuid().safeParse(value).success;
 
 // Spec §5.3 step 2. The callback only says "look now". The API ignores the body and reads the
 // task from the provider with the user's key, so a forged body cannot change a song.

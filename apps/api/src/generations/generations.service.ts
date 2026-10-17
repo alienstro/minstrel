@@ -8,10 +8,10 @@ import {
   type MusicAdapter,
   type Page,
 } from '@minstrel/shared';
-import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { ApiError, notFound } from '../common/api-error.js';
+import { isUuid } from '../common/is-uuid.js';
 import { BackgroundWork } from '../common/background-work.js';
 import { ConnectionsService } from '../connections/connections.service.js';
 import { DB, type Db } from '../db/db.module.js';
@@ -26,8 +26,6 @@ import { SyncService } from './sync.service.js';
 
 const PAGE_SIZE = 20;
 const MAX_SYNCS_PER_LIST = 5;
-
-const isUuid = (value: string) => z.uuid().safeParse(value).success;
 
 export const hashToken = (token: string): Buffer => createHash('sha256').update(token).digest();
 
