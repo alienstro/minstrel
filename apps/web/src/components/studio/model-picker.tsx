@@ -133,10 +133,11 @@ export function ModelPicker({
     }
   }
 
-  let index = -1;
-  const renderOption = (entry: Entry) => {
-    index += 1;
-    const i = index;
+  // The index of an option in `flat`, which the keyboard highlight uses. Recent options come first.
+  const groupStarts = grouped.map(
+    (_, g) => recentEntries.length + grouped.slice(0, g).reduce((n, x) => n + x.entries.length, 0),
+  );
+  const renderOption = (entry: Entry, i: number) => {
     return (
       <li
         key={`${i}-${entry.connectionId}-${entry.modelId}`}
@@ -197,17 +198,17 @@ export function ModelPicker({
                   <li role="presentation" id={`${baseId}-recent`} className="type-label px-3 py-1 text-muted">
                     Recent
                   </li>
-                  {recentEntries.map(renderOption)}
+                  {recentEntries.map((entry, j) => renderOption(entry, j))}
                 </ul>
               </li>
             ) : null}
-            {grouped.map(({ group, entries }) => (
+            {grouped.map(({ group, entries }, g) => (
               <li role="presentation" key={group.connectionId}>
                 <ul role="group" aria-labelledby={`${baseId}-group-${group.connectionId}`}>
                   <li role="presentation" id={`${baseId}-group-${group.connectionId}`} className="type-label px-3 py-1 text-muted">
                     {group.connectionLabel}
                   </li>
-                  {entries.map(renderOption)}
+                  {entries.map((entry, j) => renderOption(entry, groupStarts[g]! + j))}
                 </ul>
               </li>
             ))}
