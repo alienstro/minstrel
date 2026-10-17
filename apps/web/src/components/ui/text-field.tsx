@@ -30,7 +30,7 @@ export function TextField({ label, error, id, ...input }: TextFieldProps) {
 
 export function FieldError({ id, children }: { id: string; children: React.ReactNode }) {
   return (
-    <p id={id} className="type-label flex items-center gap-1 text-ink">
+    <p id={id} className="flex items-center gap-1 text-[12px] font-semibold text-ink">
       <span aria-hidden="true">⚠</span>
       {children}
     </p>

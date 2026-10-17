@@ -22,14 +22,14 @@ describe('password reset', () => {
 
     const first = render(<ForgotPasswordForm />);
     await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
-    await userEvent.click(screen.getByRole('button', { name: /send link/i }));
+    await userEvent.click(screen.getByRole('button', { name: /send reset link/i }));
     expect(await screen.findByRole('status')).toHaveTextContent(SENT);
     expect(auth.requestPasswordReset).toHaveBeenCalledWith({ email: 'ada@example.com', redirectTo: '/reset-password' });
     first.unmount();
 
     render(<ForgotPasswordForm />);
     await userEvent.type(screen.getByLabelText('Email'), 'nobody@example.com');
-    await userEvent.click(screen.getByRole('button', { name: /send link/i }));
+    await userEvent.click(screen.getByRole('button', { name: /send reset link/i }));
     expect(await screen.findByRole('status')).toHaveTextContent(SENT);
   });
 
@@ -37,9 +37,21 @@ describe('password reset', () => {
     auth.resetPassword.mockResolvedValue({ data: { status: true }, error: null });
     render(<ResetPasswordForm token="tok-123" />);
     await userEvent.type(screen.getByLabelText('New password'), 'a new long password');
-    await userEvent.click(screen.getByRole('button', { name: /set password/i }));
+    await userEvent.type(screen.getByLabelText('New password again'), 'a new long password');
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
     expect(auth.resetPassword).toHaveBeenCalledWith({ token: 'tok-123', newPassword: 'a new long password' });
     expect(await screen.findByRole('status')).toHaveTextContent('Your password is changed');
+  });
+
+  it('reset does not send two passwords that differ', async () => {
+    render(<ResetPasswordForm token="tok-123" />);
+    await userEvent.type(screen.getByLabelText('New password'), 'a new long password');
+    await userEvent.type(screen.getByLabelText('New password again'), 'a new long passwort');
+    await userEvent.click(screen.getByRole('button', { name: /save/i }));
+    const again = screen.getByLabelText('New password again');
+    expect(again).toHaveAttribute('aria-invalid', 'true');
+    expect(document.getElementById(again.getAttribute('aria-describedby')!)).toHaveTextContent('The two passwords differ');
+    expect(auth.resetPassword).not.toHaveBeenCalled();
   });
 
   it('a missing token shows an error and a link to forgot password', () => {

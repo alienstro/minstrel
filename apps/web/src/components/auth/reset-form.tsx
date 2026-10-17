@@ -2,13 +2,24 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { type FormEvent, useState } from 'react';
-import { FieldError, TextField } from '@/components/ui/text-field';
+import { type CSSProperties, type FormEvent, type ReactNode, useId, useState } from 'react';
+import { AuthStage } from '@/components/brand/auth-stage';
+import { FieldError } from '@/components/ui/text-field';
 import { authClient } from '@/lib/auth-client';
+import { AuthField, AuthFieldErrors } from './auth-field';
 
 const MIN_PASSWORD = 8;
+const STAR: [string, string] = ['NO', 'WORRIES'];
+
+// A one-line card for a result: the message on the left, the next step on the right.
+const ROW: CSSProperties = { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', padding: '12px 12px 12px 24px' };
+
+function Hint({ children }: { children: ReactNode }) {
+  return <p className="mono mu m-0 text-center text-[11px]">{children}</p>;
+}
 
 export function ForgotPasswordForm() {
+  const emailId = useId();
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -17,6 +28,7 @@ export function ForgotPasswordForm() {
     event.preventDefault();
     const email = String(new FormData(event.currentTarget).get('email') ?? '').trim();
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError('Enter an email address.');
+    setError(undefined);
     setBusy(true);
     // The reply is the same for each email, so that the page does not show which emails have an account.
     await authClient.requestPasswordReset({ email, redirectTo: '/reset-password' }).catch(() => undefined);
@@ -26,45 +38,85 @@ export function ForgotPasswordForm() {
 
   if (sent) {
     return (
-      <p role="status" className="card">
-        If an account uses this email, we sent a link to reset the password.
-      </p>
+      <AuthStage label="Check your email" heading="Link sent" starText={STAR}>
+        <div className="flex flex-col items-center gap-3.5">
+          <div className="card w-full" style={ROW}>
+            <p role="status" className="m-0 text-[14px]">
+              If an account uses this email, we sent a link to reset the password.
+            </p>
+          </div>
+          <Hint>
+            No email? Look in your spam folder, or{' '}
+            <button type="button" className="dotted text-ink" onClick={() => setSent(false)}>
+              send it again
+            </button>
+          </Hint>
+        </div>
+      </AuthStage>
     );
   }
   return (
-    <form noValidate onSubmit={onSubmit} className="card flex flex-col gap-4">
-      <span className="card-pill">Reset password</span>
-      <TextField label="Email" name="email" type="email" autoComplete="email" error={error} />
-      <button type="submit" className="btn btn-primary" disabled={busy}>
-        <span>Send link</span>
-        <span aria-hidden="true">›</span>
-      </button>
-    </form>
+    <AuthStage label="Forgot your password" heading="Reset it" starText={STAR}>
+      <form noValidate onSubmit={onSubmit} aria-label="Reset your password" className="flex flex-col items-center gap-3.5">
+        <div className="card w-full">
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <AuthField
+              id={emailId}
+              label="Email"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="The email of your account"
+              error={error}
+            />
+            <button type="submit" className="pill dark" style={{ flex: '0 0 auto' }} disabled={busy}>
+              Send reset link <span aria-hidden="true">→</span>
+            </button>
+          </div>
+        </div>
+        <AuthFieldErrors errors={[{ id: emailId, message: error }]} />
+        <Hint>
+          Remembered it?{' '}
+          <Link href="/sign-in" className="dotted text-ink">
+            Sign in
+          </Link>
+        </Hint>
+      </form>
+    </AuthStage>
   );
 }
 
+type ResetFields = Partial<Record<'password' | 'again', string>>;
+
 export function ResetPasswordForm({ token }: { token: string | null }) {
-  const [error, setError] = useState<string>();
+  const ids = useId();
+  const [fields, setFields] = useState<ResetFields>({});
   const [formError, setFormError] = useState<string>();
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
 
   if (!token) {
     return (
-      <div role="alert" className="card flex flex-col gap-3">
-        <FieldError id="reset-token-error">This link is not complete.</FieldError>
-        <Link href="/forgot-password" className="underline">
-          Get a new link
-        </Link>
-      </div>
+      <AuthStage label="Choose a new one" heading="New password" starText={STAR}>
+        <div role="alert" className="card w-full" style={ROW}>
+          <FieldError id="reset-token-error">This link is not complete.</FieldError>
+          <Link href="/forgot-password" className="pill dark">
+            Get a new link <span aria-hidden="true">→</span>
+          </Link>
+        </div>
+      </AuthStage>
     );
   }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const newPassword = String(new FormData(event.currentTarget).get('password') ?? '');
-    if (newPassword.length < MIN_PASSWORD) return setError(`Use at least ${MIN_PASSWORD} characters.`);
-    setError(undefined);
+    const form = new FormData(event.currentTarget);
+    const newPassword = String(form.get('password') ?? '');
+    const errors: ResetFields = {};
+    if (newPassword.length < MIN_PASSWORD) errors.password = `Use at least ${MIN_PASSWORD} characters.`;
+    else if (String(form.get('again') ?? '') !== newPassword) errors.again = 'The two passwords differ.';
+    setFields(errors);
+    if (Object.keys(errors).length > 0) return;
     setBusy(true);
     const { error: apiError } = await authClient.resetPassword({ token: token!, newPassword });
     setBusy(false);
@@ -74,28 +126,53 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
 
   if (done) {
     return (
-      <p role="status" className="card">
-        Your password is changed. <Link href="/sign-in" className="underline">Sign in</Link>
-      </p>
+      <AuthStage label="All set" heading="Password saved" starText={STAR}>
+        <div className="flex flex-col items-center gap-3.5">
+          <div className="card w-full" style={ROW}>
+            <p role="status" className="m-0 text-[14px]">
+              Your password is changed.
+            </p>
+            <Link href="/sign-in" className="pill dark">
+              Sign in <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+          <Hint>Your API keys and your songs did not change.</Hint>
+        </div>
+      </AuthStage>
     );
   }
+
+  const passwordId = `${ids}-password`;
+  const againId = `${ids}-again`;
   return (
-    <form noValidate onSubmit={onSubmit} className="card flex flex-col gap-4">
-      <span className="card-pill">New password</span>
-      <TextField label="New password" name="password" type="password" autoComplete="new-password" error={error} />
-      {formError ? (
-        <div role="alert">
-          <FieldError id="reset-form-error">{formError}</FieldError>
-          <Link href="/forgot-password" className="underline">
-            Get a new link
-          </Link>
+    <AuthStage label="Choose a new one" heading="New password" starText={STAR}>
+      <form noValidate onSubmit={onSubmit} aria-label="Choose a new password" className="flex flex-col items-center gap-3.5">
+        <div className="card w-full">
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <AuthField id={passwordId} label="New password" name="password" type="password" autoComplete="new-password" error={fields.password} />
+            <AuthField id={againId} label="New password again" name="again" type="password" autoComplete="new-password" error={fields.again} />
+            <button type="submit" className="pill dark" style={{ flex: '0 0 auto' }} disabled={busy}>
+              Save <span aria-hidden="true">→</span>
+            </button>
+          </div>
         </div>
-      ) : null}
-      <button type="submit" className="btn btn-primary" disabled={busy}>
-        <span>Set password</span>
-        <span aria-hidden="true">›</span>
-      </button>
-    </form>
+        <AuthFieldErrors
+          errors={[
+            { id: passwordId, message: fields.password },
+            { id: againId, message: fields.again },
+          ]}
+        />
+        {formError ? (
+          <div role="alert" className="flex flex-col items-center gap-1">
+            <FieldError id="reset-form-error">{formError}</FieldError>
+            <Link href="/forgot-password" className="dotted">
+              Get a new link
+            </Link>
+          </div>
+        ) : null}
+        <Hint>Use {MIN_PASSWORD} or more characters. A short sentence is easy to remember.</Hint>
+      </form>
+    </AuthStage>
   );
 }
 
