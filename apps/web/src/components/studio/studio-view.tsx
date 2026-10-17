@@ -36,8 +36,10 @@ export function StudioView() {
   const connections = useQuery(connectionsQuery);
   const providers = useQuery(providersQuery);
   const music = (connections.data ?? []).filter((c) => c.kind === 'music');
+  // Music models feed the Model picker. Text models feed the Helper model picker.
+  const withModels = connections.data ?? [];
   const modelQueries = useQueries({
-    queries: music.map((c) => ({
+    queries: withModels.map((c) => ({
       queryKey: ['models', c.id],
       queryFn: () => apiFetch<ModelOption[]>(`/api/connections/${c.id}/models`),
       staleTime: 5 * 60_000,
@@ -68,7 +70,7 @@ export function StudioView() {
     );
   }
 
-  const models = Object.fromEntries(music.map((c, i) => [c.id, modelQueries[i]?.data ?? []]));
+  const models = Object.fromEntries(withModels.map((c, i) => [c.id, modelQueries[i]?.data ?? []]));
   return (
     <div className="flex flex-wrap items-start gap-x-16 gap-y-14">
       <div className="min-w-0 flex-[999_1_560px]">
