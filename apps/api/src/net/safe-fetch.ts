@@ -37,6 +37,9 @@ export interface SafeFetchInit extends Omit<
   totalTimeoutMs?: number;
 }
 
+/** The DI token for the SafeFetch that downloads provider audio. A test replaces it with a fake. */
+export const SAFE_FETCH = Symbol('SAFE_FETCH');
+
 export type SafeFetch = (
   url: string,
   init?: SafeFetchInit,

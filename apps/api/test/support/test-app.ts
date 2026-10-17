@@ -10,6 +10,9 @@ import {
   TEXT_PROVIDER,
 } from '../../src/providers/registry.js';
 import type { MusicProvider, TextProvider } from '../../src/providers/types.js';
+import { SAFE_FETCH, type SafeFetch } from '../../src/net/safe-fetch.js';
+import { AUDIO_STORE } from '../../src/storage/audio-store.js';
+import { FakeAudioStore } from './fake-audio-store.js';
 import { FakeBackgroundWork } from './fake-background-work.js';
 import { FakeMailer } from './fake-mailer.js';
 import { fakeMusicProviders, fakeTextProvider } from './fake-providers.js';
@@ -22,6 +25,7 @@ export interface TestApp {
   app: INestApplication<App>;
   mailer: FakeMailer;
   background: FakeBackgroundWork;
+  audioStore: FakeAudioStore;
 }
 
 export interface TestAppOptions {
@@ -30,7 +34,13 @@ export interface TestAppOptions {
   /** The fake providers replace the real ones, so no test calls a provider. */
   musicProviders?: MusicProvider[];
   textProvider?: TextProvider;
+  /** The outbound fetch for audio downloads. The default throws, so no test calls the network. */
+  safeFetch?: SafeFetch;
 }
+
+const noNetwork: SafeFetch = async (url) => {
+  throw new Error(`The test made an unexpected fetch to ${url}`);
+};
 
 export async function createTestApp(
   options: TestAppOptions = {},
@@ -46,6 +56,7 @@ process.env.R2_SECRET_ACCESS_KEY ??= 'test-secret';
 process.env.R2_BUCKET ??= 'test-bucket';
   const mailer = new FakeMailer();
   const background = new FakeBackgroundWork();
+  const audioStore = new FakeAudioStore();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
     controllers: options.controllers ?? [],
@@ -58,11 +69,15 @@ process.env.R2_BUCKET ??= 'test-bucket';
     .useValue(options.musicProviders ?? fakeMusicProviders())
     .overrideProvider(TEXT_PROVIDER)
     .useValue(options.textProvider ?? fakeTextProvider())
+    .overrideProvider(AUDIO_STORE)
+    .useValue(audioStore)
+    .overrideProvider(SAFE_FETCH)
+    .useValue(options.safeFetch ?? noNetwork)
     .compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>({
     bodyParser: false,
   });
   configureApp(app);
   await app.init();
-  return { app, mailer, background };
+  return { app, mailer, background, audioStore };
 }
