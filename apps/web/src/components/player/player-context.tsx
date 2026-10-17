@@ -32,6 +32,8 @@ interface PlayerValue {
   seek(seconds: number): void;
   /** Moves forward (or back, with a negative value) from the current time. */
   skip(seconds: number): void;
+  /** Stops the song and removes the player. */
+  close(): void;
 }
 
 const PlayerContext = createContext<PlayerValue | null>(null);
@@ -94,6 +96,21 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     [seek],
   );
 
+  const close = useCallback(() => {
+    const audio = audioRef.current;
+    // Clear the track first, so that onError does not load the stream again.
+    currentRef.current = null;
+    setCurrent(null);
+    setPosition(0);
+    setDuration(0);
+    if (!audio) return;
+    audio.pause();
+    // Without a source, load() stops the download of the old stream.
+    audio.removeAttribute('src');
+    audio.load();
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
+  }, []);
+
   // Media Session: the lock screen and the media keys show the song and control the player.
   useEffect(() => {
     if (!current || !('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
@@ -143,8 +160,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo<PlayerValue>(
-    () => ({ current, playing, position, duration, play, pause, toggle, seek, skip }),
-    [current, playing, position, duration, play, pause, toggle, seek, skip],
+    () => ({ current, playing, position, duration, play, pause, toggle, seek, skip, close }),
+    [current, playing, position, duration, play, pause, toggle, seek, skip, close],
   );
 
   return (

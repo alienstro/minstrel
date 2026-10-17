@@ -12,7 +12,7 @@ import type {
   ProviderInfo,
 } from '@minstrel/shared';
 import { useMutation } from '@tanstack/react-query';
-import { type FormEvent, useRef, useState } from 'react';
+import { type CSSProperties, type FormEvent, useRef, useState } from 'react';
 import { FieldError } from '@/components/ui/text-field';
 import { ApiClientError, apiFetch } from '@/lib/api';
 import { type ModelGroup, ModelPicker, type ModelValue } from './model-picker';
@@ -107,11 +107,12 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   const showStyle = caps?.style ?? true;
 
   return (
-    <form noValidate onSubmit={onSubmit} className="flex flex-col gap-5">
-      <Field id="song-idea" label="Idea" error={errors.idea}>
+    <form noValidate onSubmit={onSubmit} aria-label="New song" className="flex flex-col gap-6">
+      <Field id="song-idea" label="What is the song about?" error={errors.idea}>
         <textarea
           id="song-idea"
-          className="field min-h-20"
+          className="idea"
+          rows={2}
           placeholder="A sea shanty about a lost cat"
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
@@ -119,20 +120,73 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         />
       </Field>
 
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0 max-w-[440px] flex-[1_1_280px]">
+          <ModelPicker
+            groups={groups}
+            value={model}
+            onPick={setModel}
+            errorId={errors.model ? 'song-model-error' : undefined}
+          />
+          {errors.model ? (
+            <div className="mt-2 pl-5">
+              <FieldError id="song-model-error">{errors.model}</FieldError>
+            </div>
+          ) : null}
+        </div>
+        {caps?.instrumental ?? true ? (
+          <label className="sw">
+            <input type="checkbox" checked={instrumental} onChange={(e) => setInstrumental(e.target.checked)} />
+            Instrumental
+          </label>
+        ) : null}
+      </div>
+
+      {range ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-3 pr-5">
+            <label htmlFor="song-length" className="lbl">
+              Length
+            </label>
+            <span className="mono text-[11px] tabular-nums" aria-hidden="true">
+              {formatSeconds(clamp(length, range))}
+            </span>
+          </div>
+          <div className="flex px-5">
+            <input
+              id="song-length"
+              className="seek"
+              type="range"
+              min={range.min}
+              max={range.max}
+              step={LENGTH_STEP}
+              value={clamp(length, range)}
+              aria-valuetext={formatSeconds(clamp(length, range))}
+              onChange={(e) => setLength(Number(e.target.value))}
+              style={{ '--p': `${((clamp(length, range) - range.min) / Math.max(range.max - range.min, 1)) * 100}%` } as CSSProperties}
+            />
+          </div>
+          <p className="hint">
+            From {formatSeconds(range.min)} to {formatSeconds(range.max)}.
+          </p>
+        </div>
+      ) : null}
+
       {showLyrics ? (
         <Field
           id="song-lyrics"
           label="Lyrics"
           error={errors.lyrics}
           action={
-            <button type="button" className="btn btn-soft" disabled={helperDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
+            <button type="button" className="txt" disabled={helperDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
               Write lyrics
             </button>
           }
         >
           <textarea
             id="song-lyrics"
-            className="field min-h-48 leading-normal"
+            className="in rounded-[24px] px-5 py-4 leading-[1.7]"
+            rows={7}
             value={lyrics}
             disabled={instrumental}
             onChange={(e) => setLyrics(e.target.value)}
@@ -141,96 +195,61 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         </Field>
       ) : null}
 
-      {showStyle ? (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {showStyle ? (
+          <Field
+            id="song-style"
+            label="Style"
+            error={errors.style}
+            action={
+              <button type="button" aria-label="Suggest a style" className="txt" disabled={helperDisabled} onClick={() => help('style', setStyle)}>
+                Suggest
+              </button>
+            }
+          >
+            <input
+              id="song-style"
+              className="in"
+              placeholder="shanty, accordion"
+              value={style}
+              onChange={(e) => setStyle(e.target.value)}
+              {...describedBy('song-style', errors.style)}
+            />
+          </Field>
+        ) : null}
         <Field
-          id="song-style"
-          label="Style"
-          error={errors.style}
+          id="song-title"
+          label="Title"
+          error={errors.title}
           action={
-            <button type="button" aria-label="Suggest a style" className="btn btn-soft" disabled={helperDisabled} onClick={() => help('style', setStyle)}>
+            <button type="button" aria-label="Suggest a title" className="txt" disabled={helperDisabled} onClick={() => help('title', setTitle)}>
               Suggest
             </button>
           }
         >
           <input
-            id="song-style"
-            className="field"
-            placeholder="shanty, accordion"
-            value={style}
-            onChange={(e) => setStyle(e.target.value)}
-            {...describedBy('song-style', errors.style)}
+            id="song-title"
+            className="in"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            {...describedBy('song-title', errors.title)}
           />
         </Field>
-      ) : null}
-
-      <Field
-        id="song-title"
-        label="Title"
-        error={errors.title}
-        action={
-          <button type="button" aria-label="Suggest a title" className="btn btn-soft" disabled={helperDisabled} onClick={() => help('title', setTitle)}>
-            Suggest
-          </button>
-        }
-      >
-        <input
-          id="song-title"
-          className="field"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          {...describedBy('song-title', errors.title)}
-        />
-      </Field>
-
-      {!textConnection ? (
-        <p className="type-label text-muted">Add a text provider key in Settings to use Write lyrics and Suggest.</p>
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-end">
-        {caps?.instrumental ?? true ? (
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={instrumental} onChange={(e) => setInstrumental(e.target.checked)} />
-            Instrumental
-          </label>
-        ) : null}
-        <div>
-          <ModelPicker
-            groups={groups}
-            value={model}
-            onPick={setModel}
-            errorId={errors.model ? 'song-model-error' : undefined}
-          />
-          {errors.model ? <FieldError id="song-model-error">{errors.model}</FieldError> : null}
-        </div>
       </div>
 
-      {range ? (
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="song-length" className="type-label text-muted">
-            Length <span className="tabular">{formatSeconds(clamp(length, range))}</span>
-          </label>
-          <input
-            id="song-length"
-            type="range"
-            min={range.min}
-            max={range.max}
-            step={LENGTH_STEP}
-            value={clamp(length, range)}
-            onChange={(e) => setLength(Number(e.target.value))}
-          />
-        </div>
-      ) : null}
+      {!textConnection ? <p className="hint">Add a text provider key in Settings to use Write lyrics and Suggest.</p> : null}
 
       {errors.form ? (
-        <div role="alert">
+        <div role="alert" className="pl-5">
           <FieldError id="song-form-error">{errors.form}</FieldError>
         </div>
       ) : null}
 
-      <button type="submit" className="btn btn-primary self-end" disabled={create.isPending}>
-        <span>{create.isPending ? 'Sending…' : 'Make song'}</span>
-        <span aria-hidden="true">›</span>
-      </button>
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-4">
+        <button type="submit" className="pill dark ml-auto min-w-[220px]" disabled={create.isPending}>
+          {create.isPending ? 'Sending…' : 'Make song'} <span aria-hidden="true">→</span>
+        </button>
+      </div>
     </form>
   );
 }
@@ -249,15 +268,19 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between gap-3">
-        <label htmlFor={id} className="type-label text-muted">
+    <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-h-8 items-center justify-between gap-3 pr-5">
+        <label htmlFor={id} className="lbl">
           {label}
         </label>
         {action}
       </div>
       {children}
-      {error ? <FieldError id={`${id}-error`}>{error}</FieldError> : null}
+      {error ? (
+        <div className="pl-5">
+          <FieldError id={`${id}-error`}>{error}</FieldError>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -178,6 +178,341 @@
     cursor: pointer;
   }
 
+  /* The signed-in app: the Main, Library, Connections and Account artboards. */
+  .nl {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 44px;
+    color: var(--mu);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  .nl:hover,
+  .nl[aria-current] {
+    color: var(--ink);
+  }
+
+  .nl::after {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: transparent;
+  }
+
+  .nl[aria-current]::after {
+    background: var(--ink);
+  }
+
+  .lbl {
+    padding-left: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .hint {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--mu);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .txt {
+    min-height: 32px;
+    padding: 0;
+    border: none;
+    border-bottom: 1px dotted rgb(0 0 0 / 30%);
+    background: none;
+    color: var(--ink);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .txt:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .idea {
+    width: 100%;
+    padding: 18px 24px;
+    border: none;
+    border-radius: 24px;
+    background: var(--cream2);
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-size: 34px;
+    font-style: italic;
+    line-height: 1.15;
+    resize: none;
+  }
+
+  .idea:focus {
+    outline: 2px solid var(--ink);
+    background: #ffffff;
+  }
+
+  .idea[aria-invalid="true"] {
+    outline: 2px solid var(--ink);
+  }
+
+  .sw {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .sw input {
+    position: relative;
+    flex: none;
+    width: 44px;
+    height: 26px;
+    margin: 0;
+    border-radius: 13px;
+    background: var(--cream3);
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .sw input::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ffffff;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .sw input:checked {
+    background: var(--ink);
+  }
+
+  .sw input:checked::after {
+    transform: translateX(18px);
+  }
+
+  .sw input:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  /* A row in a list: dotted lines between rows, and a soft gray when the pointer is on it. */
+  .rel {
+    position: relative;
+    border-bottom: 1px dotted rgb(0 0 0 / 8%);
+  }
+
+  .rel:first-child {
+    border-top: 1px dotted rgb(0 0 0 / 8%);
+  }
+
+  .rel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: rgb(0 0 0 / 5%);
+    opacity: 0;
+    transform: scale(0.98);
+    transition:
+      transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+      opacity 0.2s ease;
+    pointer-events: none;
+  }
+
+  .rel:hover::after {
+    opacity: 1;
+    transform: none;
+  }
+
+  .rel[data-on="true"]::after {
+    opacity: 1;
+    transform: none;
+    background: rgb(0 0 0 / 7%);
+  }
+
+  .seek {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 24px;
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    appearance: none;
+  }
+
+  .seek::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background:
+      linear-gradient(var(--ink), var(--ink)) 0 0 / var(--p, 0%) 100% no-repeat,
+      var(--cream3);
+  }
+
+  .seek::-webkit-slider-thumb {
+    width: 12px;
+    height: 12px;
+    margin-top: -4px;
+    border: none;
+    border-radius: 50%;
+    background: var(--ink);
+    appearance: none;
+  }
+
+  .seek::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--cream3);
+  }
+
+  .seek::-moz-range-progress {
+    height: 4px;
+    border-radius: 2px;
+    background: var(--ink);
+  }
+
+  .seek::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border: none;
+    border-radius: 50%;
+    background: var(--ink);
+  }
+
+  .seek:focus-visible {
+    outline: none;
+  }
+
+  .seek:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px var(--ink);
+  }
+
+  .seek:focus-visible::-moz-range-thumb {
+    box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px var(--ink);
+  }
+
+  /* The record: a silver disc behind a square cover. */
+  .disc {
+    border-radius: 50%;
+    background:
+      radial-gradient(circle, #ffffff 0 9%, #bdbdbd 9.5% 10.5%, #f2f2f2 11% 17%, transparent 17.5%),
+      conic-gradient(from 20deg, #d6d6d6, #fafafa, #cfcfcf, #f4f4f4, #d9d9d9, #fbfbfb, #d6d6d6);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+    animation: disc-spin 6s linear infinite;
+  }
+
+  .disc[data-paused="true"] {
+    animation-play-state: paused;
+  }
+
+  .art {
+    flex: none;
+    border-radius: 8px;
+    outline: 0.5px solid rgb(0 0 0 / 16%);
+    background: var(--cream3) center / cover no-repeat;
+  }
+
+  .mp {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: linear-gradient(#ffffff, #e8e7ea);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+  }
+
+  .mb {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--ink);
+    opacity: 0.7;
+    cursor: pointer;
+  }
+
+  .mb:hover {
+    opacity: 0.9;
+  }
+
+  .mb:disabled {
+    cursor: default;
+    opacity: 0.15;
+  }
+
+  .pi {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: none;
+    color: var(--mu);
+    cursor: pointer;
+  }
+
+  .pi:hover {
+    background: var(--cream);
+    color: var(--ink);
+  }
+
+  .bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 12px;
+  }
+
+  .bars i {
+    display: block;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--ink);
+    animation: bars-eq 1s ease-in-out infinite;
+  }
+
+  .bars i:nth-child(2) {
+    animation-delay: -0.3s;
+  }
+
+  .bars i:nth-child(3) {
+    animation-delay: -0.6s;
+  }
+
+  .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ink);
+    animation: dot-pulse 2s linear infinite;
+  }
+
   /* Older classes. They take the canvas look until each screen moves to the canvas markup. */
   .type-page-title {
     font-family: var(--font-serif);
@@ -293,6 +628,34 @@
     border-bottom: 1px dotted var(--bd);
     border-radius: 0;
     font-weight: 400;
+  }
+}
+
+@keyframes disc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes bars-eq {
+  0%,
+  100% {
+    height: 3px;
+  }
+
+  50% {
+    height: 12px;
+  }
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.25;
   }
 }
 

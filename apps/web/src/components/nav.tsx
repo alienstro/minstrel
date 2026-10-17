@@ -2,44 +2,33 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Logo } from '@/components/brand/logo';
 
 const ITEMS = [
-  { href: '/studio', label: 'Studio' },
-  { href: '/library', label: 'Library' },
+  { href: '/studio', label: 'Studio', prefix: '/studio' },
+  { href: '/library', label: 'Library', prefix: '/library' },
+  { href: '/settings/connections', label: 'Settings', prefix: '/settings' },
 ] as const;
 
-const SETTINGS = { href: '/settings/connections', label: 'Settings', prefix: '/settings' } as const;
-
+// The canvas header: the links on the left, the name in the middle. A dot marks the current page.
 export function Nav() {
   const pathname = usePathname();
   const isCurrent = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
   return (
-    <nav aria-label="Main" className="flex items-center gap-2 px-4 py-4 sm:px-8">
-      <Link href="/studio" className="type-page-title mr-4">
+    <header className="mx-auto flex min-h-[76px] w-full max-w-[1200px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 sm:px-8">
+      <nav aria-label="Main" className="order-first flex flex-1 gap-7">
+        {ITEMS.map((item) => (
+          <Link key={item.href} href={item.href} className="nl" aria-current={isCurrent(item.prefix) ? 'page' : undefined}>
+            {item.label}
+          </Link>
+        ))}
+      </nav>
+      <Link href="/studio" className="inline-flex items-center gap-2.5 font-semibold tracking-[0.02em] uppercase no-underline">
+        <Logo />
         Minstrel
       </Link>
-      {ITEMS.map((item) => (
-        <NavLink key={item.href} href={item.href} label={item.label} current={isCurrent(item.href)} />
-      ))}
-      <span className="flex-1" />
-      <NavLink href={SETTINGS.href} label={SETTINGS.label} current={isCurrent(SETTINGS.prefix)} />
-    </nav>
-  );
-}
-
-function NavLink({ href, label, current }: { href: string; label: string; current: boolean }) {
-  return (
-    <Link
-      href={href}
-      aria-current={current ? 'page' : undefined}
-      className={
-        current
-          ? 'rounded-[13px] bg-action px-3 py-1 text-on-action'
-          : 'rounded-[13px] px-3 py-1 text-ink hover:bg-panel'
-      }
-    >
-      {label}
-    </Link>
+      <span className="hidden flex-1 sm:block" />
+    </header>
   );
 }

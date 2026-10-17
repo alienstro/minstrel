@@ -132,4 +132,28 @@ describe('player', () => {
     fireEvent.loadedMetadata(audio);
     expect(audio.currentTime).toBe(80);
   });
+
+  it('Close player stops the song and removes the bar', async () => {
+    const audio = renderPlayer();
+    await userEvent.click(screen.getByRole('button', { name: 'Play take' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close player' }));
+
+    expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
+    expect(audio.getAttribute('src')).toBeNull();
+    expect(screen.queryByRole('region', { name: /Player/ })).toBeNull();
+  });
+
+  it('Hide player keeps the song and shows a small bar', async () => {
+    renderPlayer();
+    await userEvent.click(screen.getByRole('button', { name: 'Play take' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide player' }));
+
+    const small = screen.getByRole('region', { name: 'Player, hidden' });
+    expect(small).toHaveTextContent('The Cat Who Sailed');
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show player' }));
+    expect(screen.getByRole('region', { name: 'Player' })).toBeInTheDocument();
+  });
 });
