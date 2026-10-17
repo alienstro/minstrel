@@ -1,8 +1,11 @@
 # Deploy Minstrel on Dokploy
 
-Minstrel runs on the private server `root@main` (Ubuntu 24.04, public IP `175.100.20.52`) with
-Dokploy. Cloudflare R2 holds the audio files and the database backups. All other parts run on the
-server.
+Minstrel runs on the private server `root@main` (Ubuntu 24.04) with Dokploy. Cloudflare R2 holds
+the audio files and the database backups. All other parts run on the server.
+
+The server is behind a router (NAT), so the internet cannot open a connection to it. A Cloudflare
+Tunnel makes an outgoing connection from the server to Cloudflare, and Cloudflare sends the
+traffic back through it. The Dokploy panel stays on Tailscale (`http://100.105.205.7:3000`).
 
 | Part | Dokploy resource | Notes |
 |---|---|---|
@@ -11,6 +14,7 @@ server.
 | Database | Postgres 18 `minstrel-db` | Internal only, no public port |
 | Daily sweep | Schedule on `minstrel-api` | `0 4 * * *`, time zone UTC |
 | Backups | Backup of `minstrel-db` | R2 bucket `minstrel-backups`, daily, 14 kept |
+| Tunnel | App `cloudflared` | Image `cloudflare/cloudflared`, command `tunnel run`, env `TUNNEL_TOKEN` |
 
 Both apps use the domain `minstrel.alienstro.xyz`. Traefik sends `/api/*` to the API and all other
 paths to the web app, so the browser reaches the API on the same origin.
@@ -31,17 +35,34 @@ paths to the web app, so the browser reaches the API on the same origin.
 Run the lint, the tests and the build on your computer before you push (`/do-tests full`).
 GitHub runs no checks.
 
+## Cloudflare Tunnel
+
+Make the tunnel in the Cloudflare dashboard (Zero Trust, Networks, Tunnels, type Cloudflared). Put
+its token in the `cloudflared` app as `TUNNEL_TOKEN`, and attach the app to `dokploy-network`.
+
+| Public hostname | Path | Service |
+|---|---|---|
+| `minstrel.alienstro.xyz` | (all) | `http://dokploy-traefik:80` |
+| `deploy.alienstro.xyz` | `^/api/application\.deploy$` | `http://dokploy:3000` |
+
+- The Dokploy domains of `minstrel-web` and `minstrel-api` use HTTPS OFF. Cloudflare holds the
+  certificate, and the tunnel carries plain HTTP inside the server.
+- `deploy.alienstro.xyz` lets GitHub reach only the deploy call of Dokploy. All other panel paths
+  get `404`, so the panel login is not on the internet.
+- The API reads the user IP from the `cf-connecting-ip` header. Traefik sets `x-real-ip` to the
+  tunnel container, so that header is not the user IP.
+
+**Caution:** Do not open ports 80, 443 or 3000 on the router. Then a request could skip Cloudflare
+and set a false `cf-connecting-ip`.
+
 ## GitHub secrets
 
 | Secret | Value |
 |---|---|
-| `DOKPLOY_URL` | The HTTPS URL of the Dokploy panel, without `/api` |
+| `DOKPLOY_URL` | `https://deploy.alienstro.xyz` |
 | `DOKPLOY_API_KEY` | A key from Dokploy, Settings, Profile, API/CLI |
 | `DOKPLOY_API_APP_ID` | The `applicationId` of `minstrel-api` |
 | `DOKPLOY_WEB_APP_ID` | The `applicationId` of `minstrel-web` |
-
-**Warning:** Give the Dokploy panel an HTTPS domain before you add the key. Do not send the key to
-the plain HTTP port 3000.
 
 ## Environment of `minstrel-api`
 
@@ -68,9 +89,8 @@ node -e "fetch('http://localhost:4000/api/cron/sweep',{headers:{authorization:'B
 
 ## DNS
 
-Set `minstrel` to `A 175.100.20.52`. If Cloudflare holds the zone, use DNS-only (grey cloud).
-With the proxy ON, the API sees a Cloudflare IP in `x-real-ip`, and all anonymous users share one
-rate limit.
+The tunnel makes a proxied `CNAME` for each public hostname. Before you add
+`minstrel.alienstro.xyz` to the tunnel, delete the old `minstrel` CNAME that points to Vercel.
 
 ## Restore a backup
 
@@ -105,14 +125,15 @@ so this value stays the same.
 ## Webhook rate limit (open item)
 
 On Vercel, a Firewall rule allowed 120 requests each minute for each IP on `/api/webhooks/*`
-(spec §7.4). Dokploy has no such rule yet. Add a Traefik `rateLimit` middleware for that path in
-the Dokploy Traefik file settings, or accept the risk for the private beta.
+(spec §7.4). Add a Cloudflare rate limiting rule for that path in place of it. The Free plan
+allows one rule with a 10-second period, so use 20 requests each 10 seconds for each IP.
 
 ## Checks before launch
 
 1. **Client IP (§7.4).** From one network, send `POST /api/auth/sign-in/social` until Better Auth
    replies `429`. From a second network, sign in with Google at once: it must work. This proves that
-   the auth rate limit reads the real client IP from the `x-real-ip` header that Traefik sets. Then
+   the auth rate limit reads the real client IP from the `cf-connecting-ip` header that Cloudflare
+   sets. Then
    send 11 songs in one minute from one account. The 11th reply must be `429 rate_limited`.
 2. **Manual songs (§11).** On the production setup, make one real song with kie.ai. The song
    completes, and both takes play from R2.

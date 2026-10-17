@@ -12,7 +12,8 @@
 
 ## Global Constraints
 
-- Server: Ubuntu 24.04, 4 CPU, 12 GB RAM, public IP `175.100.20.52`. `9router` also runs there. Do not change it.
+- Server: Ubuntu 24.04, 4 CPU, 12 GB RAM, behind NAT (outgoing IP `143.44.145.74`, no open ports). `9router` also runs there. Do not change it.
+- Inbound traffic comes only through a Cloudflare Tunnel (decided 2026-10-17). The Dokploy panel stays on Tailscale; only `^/api/application\.deploy$` is public, on `deploy.alienstro.xyz`.
 - Domain stays `minstrel.alienstro.xyz`. So Google OAuth redirect URIs and kie.ai callback URLs (`WEB_ORIGIN`) do not change.
 - R2 stays the file store. R2 also holds the database backups, in a separate bucket `minstrel-backups`.
 - GitHub Actions does CD only. No lint, test, typecheck or image build runs on GitHub.
@@ -26,7 +27,7 @@
 1. A deploy stops the old API container while a background task runs. The task must finish, or stop after 10 s, before the process exits (Task 1).
 2. Two API containers start at the same time during a rolling deploy and both run migrations. The drizzle migrator must stay safe when it runs twice (Task 2).
 3. `MINSTREL_FAKE_PROVIDERS=1` with `NODE_ENV=production` must stop the API (Task 3).
-4. Cloudflare proxy (orange cloud) in front of Traefik changes `x-real-ip` to a Cloudflare IP, so all anonymous users share one rate limit. Use DNS-only (Task 7).
+4. Behind the tunnel, `x-real-ip` is the tunnel container, so all anonymous users would share one rate limit. The API reads `cf-connecting-ip` (Task 5b).
 5. A kie.ai callback that arrives at Vercel after the database dump writes to Neon, and the new database misses it. Do the cutover when no generation is in progress (Task 7).
 
 ---
@@ -110,16 +111,26 @@
 
 **Check:** `gh workflow run deploy.yml --ref feat/dokploy-deploy && gh run watch`
 
+### Task 5b: Client IP from Cloudflare
+
+**Goal:** Better Auth and the rate limit read the user IP from `cf-connecting-ip`.
+
+**Files:** Create `apps/api/src/common/client-ip.ts` (`CLIENT_IP_HEADER`); modify `apps/api/src/auth/auth.ts`, `apps/api/src/common/pg-throttler.storage.ts`; tests in `test/throttle.e2e-spec.ts`, `test/auth.e2e-spec.ts`.
+
+**Tests:** `each Cloudflare client IP gets its own count`, `Better Auth records the cf-connecting-ip address, not the tunnel address`.
+
+**Check:** `cd apps/api && NODE_OPTIONS=--max-old-space-size=1024 pnpm vitest run --config ./vitest.config.e2e.ts test/throttle.e2e-spec.ts --maxWorkers=1`
+
 ### Task 6: Dokploy setup (server, no code)
 
 **Goal:** Make the Dokploy resources. Ask the user before each change on the server.
 
-- [ ] Give the Dokploy panel an HTTPS domain, so the workflow does not send the API key over plain HTTP on port 3000.
+- [ ] Make the Cloudflare Tunnel, and the Dokploy app `cloudflared` on `dokploy-network`. Public hostname `deploy.alienstro.xyz`, path `^/api/application\.deploy$`, to `http://dokploy:3000`.
 - [ ] Connect the GitHub App to Dokploy for the private repository `alienstro/minstrel`.
 - [ ] Make project `minstrel` with Postgres 18 database `minstrel-db` (internal only, no public port).
 - [ ] Add an R2 S3 destination and a daily backup of `minstrel-db` to bucket `minstrel-backups`, 14 days kept. Test one restore into a scratch database.
-- [ ] Make app `minstrel-api` (Dockerfile `apps/api/Dockerfile`, context `.`), env from `apps/api/.env.example` with the Vercel values, `DATABASE_URL` and `DATABASE_URL_UNPOOLED` set to the internal URL. Domain `minstrel.alienstro.xyz`, path `/api`, no strip path, port 4000.
-- [ ] Make app `minstrel-web` (Dockerfile `apps/web/Dockerfile`). Domain `minstrel.alienstro.xyz`, path `/`, port 3000. Autodeploy OFF on both apps.
+- [ ] Make app `minstrel-api` (Dockerfile `apps/api/Dockerfile`, context `.`), env from `apps/api/.env.example` with the Vercel values, `DATABASE_URL` and `DATABASE_URL_UNPOOLED` set to the internal URL. Domain `minstrel.alienstro.xyz`, path `/api`, no strip path, port 4000, HTTPS OFF (Cloudflare holds the certificate).
+- [ ] Make app `minstrel-web` (Dockerfile `apps/web/Dockerfile`). Domain `minstrel.alienstro.xyz`, path `/`, port 3000, HTTPS OFF. Autodeploy OFF on both apps.
 - [ ] Add a schedule on `minstrel-api`: cron `0 4 * * *`, time zone UTC, command `node -e` that calls `fetch("http://localhost:4000/api/cron/sweep")` with `Authorization: Bearer $CRON_SECRET` and exits 1 when the status is not 2xx.
 - [ ] Create the Dokploy API key and the four GitHub secrets.
 
@@ -134,12 +145,12 @@
 - [ ] Stop the `minstrel-api` app in Dokploy, so its startup migration does not race the restore.
 - [ ] Dump Neon with `pg_dump -Fc --no-owner --no-acl` from the `postgres:18` image, on the server, with `DATABASE_URL_UNPOOLED`.
 - [ ] Restore into `minstrel-db` with `pg_restore --no-owner --no-acl`. Compare the row counts of `user`, `generations` and `provider_connections` with Neon.
-- [ ] Start `minstrel-api`. Test with a `curl --resolve minstrel.alienstro.xyz:443:175.100.20.52` request before you change DNS.
-- [ ] Set the DNS record `minstrel` to `A 175.100.20.52`, DNS-only (no Cloudflare proxy).
+- [ ] Start `minstrel-api`. Test on the server with `curl -H 'Host: minstrel.alienstro.xyz' http://localhost/api/health` before you change DNS.
+- [ ] Delete the `minstrel` CNAME to Vercel, then add the public hostname `minstrel.alienstro.xyz` to `http://dokploy-traefik:80` in the tunnel.
 - [ ] Smoke test: Google sign-in, one song generation with its kie.ai callback, play a file from R2, run the sweep schedule by hand.
 - [ ] Disconnect the Git integration in the Vercel project, then merge the branch. The CD workflow deploys `main`.
 
-**Check:** `curl -sI https://minstrel.alienstro.xyz/ | head -1` returns `HTTP/2 200` from the server.
+**Check:** `curl -sI https://minstrel.alienstro.xyz/ | grep -i '^server'` shows `cloudflare`, and the Dokploy logs of `minstrel-web` show the request.
 
 ### Task 8: Remove Vercel (a few days after Task 7)
 
