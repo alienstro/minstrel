@@ -55,3 +55,11 @@ export function createAuth(db: Db, env: AuthEnv, mailer: Mailer) {
 }
 
 export type Auth = ReturnType<typeof createAuth>;
+
+export function authEnvFromProcess(): AuthEnv {
+  const { WEB_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET } = process.env;
+  if (!WEB_ORIGIN || !BETTER_AUTH_SECRET) {
+    throw new Error('WEB_ORIGIN and BETTER_AUTH_SECRET must be set');
+  }
+  return { WEB_ORIGIN, BETTER_AUTH_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET };
+}
