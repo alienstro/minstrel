@@ -1,0 +1,89 @@
+/* The two scrolling columns of polaroids, stars, badges and tags on Home and the auth screens.
+   Plain CSS with a stk- prefix: next.config.ts runs each .css file as global CSS. */
+.stk-col {
+  position: absolute;
+  top: 84px;
+  bottom: 0;
+  width: 170px;
+  overflow: hidden;
+  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+  pointer-events: none;
+}
+
+.stk-large {
+  width: 190px;
+}
+
+.stk-track {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  padding: 24px 0;
+  animation: stk-scrollup 46s linear infinite;
+}
+
+.stk-right .stk-track {
+  animation-direction: reverse;
+  animation-duration: 52s;
+}
+
+.stk-pol {
+  display: block;
+  padding: 7px 7px 24px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 8%), 0 12px 24px -16px rgb(0 0 0 / 45%);
+}
+
+.stk-photo {
+  display: block;
+  width: 116px;
+  height: 116px;
+  background: var(--cream3) center / cover no-repeat;
+}
+
+.stk-large .stk-pol {
+  padding-bottom: 26px;
+}
+
+.stk-large .stk-photo {
+  width: 128px;
+  height: 128px;
+}
+
+.stk-tag {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.stk-tag-dark {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.stk-tag-light {
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: 0 0 0 1.5px var(--ink);
+}
+
+@keyframes stk-scrollup {
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@media (max-width: 900px) {
+  .stk-col {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stk-track {
+    animation: none;
+  }
+}

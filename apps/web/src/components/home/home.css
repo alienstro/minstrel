@@ -1,0 +1,268 @@
+/* The Home artboard. Plain CSS with a home- prefix: next.config.ts runs each .css file as global CSS. */
+.home-hero {
+  position: relative;
+  height: max(100dvh, 860px);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.home-center {
+  position: absolute;
+  left: 50%;
+  top: 100px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  transform: translateX(-50%);
+}
+
+.home-case {
+  position: relative;
+  width: 420px;
+  height: 300px;
+}
+
+.home-disc {
+  position: absolute;
+  top: 10px;
+  left: 132px;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, #ffffff 0 9%, #bdbdbd 9.5% 10.5%, #f2f2f2 11% 17%, transparent 17.5%),
+    conic-gradient(from 20deg, #d6d6d6, #fafafa, #cfcfcf, #f4f4f4, #d9d9d9, #fbfbfb, #d6d6d6);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+  animation: home-spin 6s linear infinite;
+}
+
+.home-cover {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 1;
+  width: 300px;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 16px;
+  outline: 0.5px solid rgb(0 0 0 / 24%);
+  background: var(--cream3) center / cover no-repeat;
+}
+
+.home-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1.5px solid rgb(255 255 255 / 12%);
+  border-radius: 16px;
+}
+
+.home-mp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 13px;
+  border-radius: 999px;
+  background: linear-gradient(#ffffff, #e8e7ea);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.home-mb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.home-mb:hover {
+  opacity: 0.9;
+}
+
+.home-dock {
+  position: absolute;
+  inset: auto 0 40px;
+  z-index: 4;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 56px 4px 5px;
+}
+
+.home-dk {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-dkb {
+  display: block;
+  width: 100%;
+  padding: 0 6px;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.home-dkc {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  outline: 0.5px solid rgb(0 0 0 / 16%);
+  background: var(--cream3) center / cover no-repeat;
+}
+
+.home-dk[data-on='true'] .home-dkc {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--ink);
+}
+
+.home-tip {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #000000;
+  color: #ffffff;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -80%);
+  transition:
+    transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.home-dk[data-hover='true'] .home-tip {
+  opacity: 1;
+  transform: translate(-50%, -140%);
+}
+
+.home-sec {
+  position: relative;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 32px;
+}
+
+.home-h {
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.home-h .serif {
+  display: block;
+  margin-top: 4px;
+  font-size: 72px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+.home-photo {
+  border-radius: 16px;
+  outline: 0.5px solid rgb(0 0 0 / 24%);
+  background: var(--cream3) center / cover no-repeat;
+}
+
+.home-fu {
+  opacity: 0;
+  animation: home-up 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes home-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes home-up {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .home-case {
+    transform: scale(0.8);
+  }
+
+  .home-about-photo {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-hero {
+    height: auto;
+    min-height: 100dvh;
+    padding-bottom: 24px;
+  }
+
+  .home-center {
+    position: relative;
+    left: auto;
+    top: auto;
+    margin-top: 32px;
+    transform: none;
+  }
+
+  .home-case {
+    margin: -30px 0;
+    transform: scale(0.7);
+  }
+
+  .home-dock {
+    position: relative;
+    inset: auto;
+    flex-wrap: wrap;
+    padding-top: 24px;
+  }
+
+  .home-h .serif {
+    font-size: 52px;
+  }
+
+  .home-sec {
+    padding-inline: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-disc {
+    animation: none;
+  }
+
+  .home-fu {
+    animation: none;
+    opacity: 1;
+  }
+
+  .home-dk,
+  .home-tip,
+  .home-mb {
+    transition: none;
+  }
+}

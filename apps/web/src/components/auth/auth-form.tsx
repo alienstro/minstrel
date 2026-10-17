@@ -30,7 +30,8 @@ const SCREEN = {
   'sign-up': { label: 'New to Minstrel', heading: 'Make an account', star: ['FIRST', 'SONG'], submit: 'Create account' },
 } as const;
 
-export function AuthForm({ mode }: { mode: Mode }) {
+// `bare` drops the stage, for a form inside another page such as Home.
+export function AuthForm({ mode, bare = false }: { mode: Mode; bare?: boolean }) {
   const router = useRouter();
   const ids = useId();
   const [fields, setFields] = useState<Fields>({});
@@ -84,8 +85,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const nameId = `${ids}-name`;
   const emailId = `${ids}-email`;
   const passwordId = `${ids}-password`;
-  return (
-    <AuthStage label={screen.label} heading={screen.heading} starText={[...screen.star] as [string, string]}>
+  const form = (
       <form noValidate onSubmit={onSubmit} aria-label={screen.heading} className="flex flex-col items-center gap-3.5">
         <div className="card w-full">
           <div className="flex w-full flex-wrap items-center gap-2">
@@ -153,6 +153,11 @@ export function AuthForm({ mode }: { mode: Mode }) {
           )}
         </p>
       </form>
+  );
+  if (bare) return form;
+  return (
+    <AuthStage label={screen.label} heading={screen.heading} starText={[...screen.star] as [string, string]}>
+      {form}
     </AuthStage>
   );
 }

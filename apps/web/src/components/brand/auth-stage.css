@@ -37,63 +37,6 @@
   font-size: 12px;
 }
 
-.auth-col {
-  position: absolute;
-  top: 84px;
-  bottom: 0;
-  width: 170px;
-  overflow: hidden;
-  mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
-  pointer-events: none;
-}
-
-.auth-track {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 36px;
-  padding: 24px 0;
-  animation: auth-scrollup 46s linear infinite;
-}
-
-.auth-right .auth-track {
-  animation-direction: reverse;
-  animation-duration: 52s;
-}
-
-.auth-pol {
-  display: block;
-  padding: 7px 7px 24px;
-  background: #ffffff;
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 8%), 0 12px 24px -16px rgb(0 0 0 / 45%);
-}
-
-.auth-photo {
-  display: block;
-  width: 116px;
-  height: 116px;
-  background: var(--cream3) center / cover no-repeat;
-}
-
-.auth-tag {
-  display: inline-block;
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-}
-
-.auth-tag-dark {
-  background: var(--ink);
-  color: #ffffff;
-}
-
-.auth-tag-light {
-  background: #ffffff;
-  color: var(--ink);
-  box-shadow: 0 0 0 1.5px var(--ink);
-}
-
 .auth-ringmask {
   position: absolute;
   inset: 0 0 auto;
@@ -233,12 +176,6 @@
   }
 }
 
-@keyframes auth-scrollup {
-  to {
-    transform: translateY(-50%);
-  }
-}
-
 @keyframes auth-pop {
   from {
     opacity: 0;
@@ -274,10 +211,6 @@
 }
 
 @media (max-width: 900px) {
-  .auth-col {
-    display: none;
-  }
-
   .auth-ringpos {
     transform: scale(0.6);
   }
@@ -325,7 +258,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .auth-track,
   .auth-ring,
   .auth-disc,
   .auth-slide {
