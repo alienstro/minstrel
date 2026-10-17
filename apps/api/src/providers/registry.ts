@@ -1,7 +1,6 @@
-import { Global, Inject, Injectable, Module, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { MusicAdapter, ProviderInfo } from '@minstrel/shared';
 import { ApiError } from '../common/api-error.js';
-import { OpenAiCompatibleTextProvider } from './openai-compatible.text.js';
 import type { MusicProvider, TextProvider } from './types.js';
 
 export const MUSIC_PROVIDERS = Symbol('MUSIC_PROVIDERS');
@@ -68,17 +67,3 @@ export class ProviderRegistry {
     return [...music, ...text];
   }
 }
-
-@Global()
-@Module({
-  providers: [
-    { provide: MUSIC_PROVIDERS, useFactory: (): MusicProvider[] => [] },
-    {
-      provide: TEXT_PROVIDER,
-      useFactory: (): TextProvider => new OpenAiCompatibleTextProvider(),
-    },
-    ProviderRegistry,
-  ],
-  exports: [ProviderRegistry],
-})
-export class ProvidersModule {}

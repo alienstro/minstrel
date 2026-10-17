@@ -14,7 +14,7 @@ import { authEnvFromProcess, createAuth } from './auth/auth.js';
 import { MAILER, ResendMailer, type Mailer } from './auth/mailer.js';
 import { ConnectionsModule } from './connections/connections.module.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
-import { ProvidersModule } from './providers/registry.js';
+import { ProvidersModule } from './providers/providers.module.js';
 
 const mailerProvider = {
   provide: MAILER,
@@ -33,7 +33,8 @@ class MailerModule {}
 
 @Module({
   imports: [
-    LoggerModule.forRoot({ pinoHttp: loggerOptions() }),
+    // process.stdout as the stream, so that a test can read the log lines.
+    LoggerModule.forRoot({ pinoHttp: [loggerOptions(), process.stdout] }),
     DbModule,
     BackgroundWorkModule,
     ProvidersModule,
