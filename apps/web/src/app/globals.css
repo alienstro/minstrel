@@ -194,3 +194,11 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Thin laser lines across the scene gray. Decorative only. */
+.laser-scene {
+  background:
+    repeating-linear-gradient(115deg, transparent 0 46px, rgb(61 255 138 / 35%) 46px 47px, transparent 47px 140px),
+    repeating-linear-gradient(65deg, transparent 0 90px, rgb(61 255 138 / 22%) 90px 91px, transparent 91px 220px),
+    var(--bg);
+}
