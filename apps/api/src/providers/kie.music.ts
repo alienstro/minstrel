@@ -45,6 +45,10 @@ const LYRICS_PROMPT_MAX = 200;
 const LYRICS_POLL_MS = 2_000;
 // The assist request must end well inside the 300 s function limit, also when each poll is slow.
 const LYRICS_TIMEOUT_MS = 60_000;
+// kie.ai continues the task and charges for it when one status check fails, so a short outage must
+// not end the request. A refused key or no credits stops at once, because a retry cannot fix them.
+const MAX_STATUS_RETRIES = 2;
+const RETRY_CODES = new Set(['provider_unavailable', 'provider_rate_limited']);
 
 const MODELS: ModelOption[] = [
   { id: 'V6', label: 'V6', note: 'Natural vocals and rich detail' },
@@ -140,9 +144,18 @@ export class KieMusicProvider implements MusicProvider {
       },
     );
     const deadline = this.now() + LYRICS_TIMEOUT_MS;
+    let failures = 0;
     while (this.now() + LYRICS_POLL_MS <= deadline) {
       await this.sleep(LYRICS_POLL_MS);
-      const record = await this.record(conn, taskId);
+      let record: KieRecord;
+      try {
+        record = await this.record(conn, taskId);
+        failures = 0;
+      } catch (error) {
+        const retry = error instanceof ApiError && RETRY_CODES.has(error.code);
+        if (!retry || ++failures > MAX_STATUS_RETRIES) throw error;
+        continue;
+      }
       if (record.state === 'fail') throw lyricsFailed(conn, record.failMsg);
       if (record.state !== 'success') continue;
       const versions = lyricsOf(record);

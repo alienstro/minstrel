@@ -327,4 +327,34 @@ describe('KieMusicProvider.writeLyrics', () => {
     expect(time.now()).toBeLessThanOrEqual(60_000);
     expect(calls.length).toBeLessThanOrEqual(31);
   });
+
+  it('writeLyrics retries a status check that fails, then returns the lyrics', async () => {
+    const { fetch, calls } = fakeFetch(
+      json(createOk),
+      json({ error: 'bad gateway' }, 502),
+      json(lyricsRecord('success', [{ text: 'Words', status: 'complete' }])),
+    );
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).resolves.toBe('Words');
+    expect(calls).toHaveLength(3);
+  });
+
+  it('writeLyrics stops after 3 status checks fail in a row', async () => {
+    const down = () => json({ error: 'bad gateway' }, 502);
+    const { fetch, calls } = fakeFetch(json(createOk), down(), down(), down(), down());
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).rejects.toMatchObject({
+      code: 'provider_unavailable',
+    });
+    expect(calls).toHaveLength(4);
+  });
+
+  it('writeLyrics does not retry a key that kie.ai refuses', async () => {
+    const { fetch, calls } = fakeFetch(json(createOk), json({ msg: 'unauthorized' }, 401), json(record('generating')));
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).rejects.toMatchObject({
+      code: 'invalid_key',
+    });
+    expect(calls).toHaveLength(2);
+  });
 });
