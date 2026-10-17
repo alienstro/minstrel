@@ -59,9 +59,9 @@ export function PrivacyPolicy() {
 
       <LegalSection title="Services that process your data">
         <ul className="m-0 list-disc space-y-2 pl-[18px]">
-          <li>Vercel runs the website and the API in its Singapore region.</li>
-          <li>Neon stores the database in Singapore.</li>
-          <li>Cloudflare R2 stores the song audio and the cover images.</li>
+          <li>Minstrel runs the website, the API, and the database on its own server in the Philippines.</li>
+          <li>Cloudflare Tunnel carries each connection between your browser and that server.</li>
+          <li>Cloudflare R2 stores the song audio, the cover images, and the database backups.</li>
           <li>Google signs you in.</li>
         </ul>
         <p>
@@ -80,12 +80,14 @@ export function PrivacyPolicy() {
       <LegalSection title="How long Minstrel keeps your data">
         <p>
           Minstrel keeps your data while your account exists. You can delete your account in Settings, Account. The
-          deletion removes your audio files first, then your account, keys, songs, and sessions. The database
-          provider keeps a restore history for a short time, at most 30 days, and then removes those copies too.
+          deletion removes your audio files first, then your account, keys, songs, and sessions. Minstrel keeps a daily
+          backup of the database, so a copy of your data stays in the backups for at most 14 days, and then the
+          backups remove it too.
         </p>
         <p>
-          Minstrel runs on free plans. If a plan reaches its limit or ends, your data can be lost with no way to get it
-          back. Minstrel keeps no other backup. Download each song that you want to keep.
+          Minstrel runs on one server and on free plans. If the server fails, or a plan reaches its limit or ends, your
+          data can be lost with no way to get it back. The database backups do not include your audio files. Download
+          each song that you want to keep.
         </p>
       </LegalSection>
 

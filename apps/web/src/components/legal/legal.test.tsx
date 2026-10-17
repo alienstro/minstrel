@@ -16,9 +16,19 @@ describe('PrivacyPolicy', () => {
 
   it('names each service that processes user data', () => {
     render(<PrivacyPolicy />);
-    for (const service of ['Vercel', 'Neon', 'Cloudflare R2', 'Google']) {
+    for (const service of ['Cloudflare Tunnel', 'Cloudflare R2', 'Google']) {
       expect(screen.getAllByText(new RegExp(service)).length).toBeGreaterThan(0);
     }
+  });
+
+  it('names no hosting service that Minstrel no longer uses', () => {
+    const { container } = render(<PrivacyPolicy />);
+    expect(container.textContent).not.toMatch(/Vercel|Neon/);
+  });
+
+  it('says that the database backups keep deleted data for at most 14 days', () => {
+    render(<PrivacyPolicy />);
+    expect(screen.getByText(/at most 14 days/)).toBeInTheDocument();
   });
 
   it('names no email service and no password, because Minstrel has Google sign-in only', () => {
