@@ -8,7 +8,7 @@ import {
 import type {
   ConnectionCheck,
   DecryptedConnection,
-  JobMusicProvider,
+  MusicProvider,
   MusicTaskResult,
 } from './types.js';
 
@@ -17,9 +17,8 @@ const CALLBACK_DELAY_MS = 500;
 // Only for the local end-to-end test (MINSTREL_FAKE_PROVIDERS=1). It takes the place of kie, calls the
 // webhook like kie does, and ends each task at once with 2 takes. The take URLs do not resolve, so the
 // R2 copy fails and the player uses the provider URL (spec §5.5).
-export class FakeMusicProvider implements JobMusicProvider {
+export class FakeMusicProvider implements MusicProvider {
   readonly adapter = 'kie' as const;
-  readonly flow = 'job' as const;
   readonly supportsCallback = true;
   readonly displayName = 'kie.ai (fake)';
   readonly defaultBaseUrl = 'https://api.kie.ai';

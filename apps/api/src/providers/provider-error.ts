@@ -55,7 +55,7 @@ export function cleanReason(reason: string): string {
   return text.length > MAX_REASON ? `${text.slice(0, MAX_REASON)}…` : text;
 }
 
-// Reads the reason from a provider error body: `error.message`, `message`, `msg`, or the ElevenLabs
+// Reads the reason from a provider error body: `error.message`, `message`, `msg`, or a FastAPI
 // `detail` (an object with `message`, or a list of `{ msg }`), else the text.
 export async function readReason(response: {
   text(): Promise<string>;

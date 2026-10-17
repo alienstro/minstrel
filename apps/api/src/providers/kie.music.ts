@@ -13,7 +13,7 @@ import { sunoMode } from './suno-mode.js';
 import type {
   ConnectionCheck,
   DecryptedConnection,
-  JobMusicProvider,
+  MusicProvider,
   MusicTaskResult,
   ProviderTrack,
 } from './types.js';
@@ -40,9 +40,8 @@ const MODELS: ModelOption[] = [
 ];
 
 // Spec §5.1, from docs.kie.ai (Generate Music, Get Task Details), checked 2026-10-17.
-export class KieMusicProvider implements JobMusicProvider {
+export class KieMusicProvider implements MusicProvider {
   readonly adapter = 'kie' as const;
-  readonly flow = 'job' as const;
   readonly supportsCallback = true;
   readonly displayName = 'kie.ai';
   readonly defaultBaseUrl = 'https://api.kie.ai';

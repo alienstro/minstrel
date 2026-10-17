@@ -44,14 +44,13 @@ describe('FakeMusicProvider', () => {
 describe('musicProvidersFromEnv', () => {
   it('uses the real providers without the flag', () => {
     const providers = musicProvidersFromEnv({});
-    expect(providers.map((p) => p.adapter)).toEqual(['kie', 'suno_classic', 'elevenlabs']);
+    expect(providers.map((p) => p.adapter)).toEqual(['kie']);
     expect(providers.some((p) => p instanceof FakeMusicProvider)).toBe(false);
   });
 
-  it('replaces kie only with the flag', () => {
+  it('replaces kie with the fake with the flag', () => {
     const providers = musicProvidersFromEnv({ MINSTREL_FAKE_PROVIDERS: '1' });
-    expect(providers.map((p) => p.adapter)).toEqual(['kie', 'suno_classic', 'elevenlabs']);
+    expect(providers.map((p) => p.adapter)).toEqual(['kie']);
     expect(providers[0]).toBeInstanceOf(FakeMusicProvider);
-    expect(providers[1]).not.toBeInstanceOf(FakeMusicProvider);
   });
 });

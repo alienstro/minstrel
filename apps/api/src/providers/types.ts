@@ -41,12 +41,6 @@ export interface MusicTaskResult {
   failureCode?: 'generation_failed' | 'content_rejected';
 }
 
-export interface DirectTrack {
-  body: ReadableStream<Uint8Array>;
-  contentType: string;
-  durationSeconds?: number;
-}
-
 interface ProviderBase {
   readonly displayName: string;
   readonly defaultBaseUrl: string;
@@ -54,17 +48,13 @@ interface ProviderBase {
   readonly keyUrl: string;
 }
 
-export interface MusicProviderBase extends ProviderBase {
+export interface MusicProvider extends ProviderBase {
   readonly adapter: MusicAdapter;
   readonly capabilities: MusicCapabilities;
   readonly inputSchema: ZodType<GenerationInput>;
+  readonly supportsCallback: boolean;
   checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck>;
   listModels(): ModelOption[];
-}
-
-export interface JobMusicProvider extends MusicProviderBase {
-  readonly flow: 'job';
-  readonly supportsCallback: boolean;
   submit(
     conn: DecryptedConnection,
     input: GenerationInput,
@@ -72,17 +62,6 @@ export interface JobMusicProvider extends MusicProviderBase {
   ): Promise<{ taskId: string }>;
   getTask(conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult>;
 }
-
-export interface DirectMusicProvider extends MusicProviderBase {
-  readonly flow: 'direct';
-  compose(
-    conn: DecryptedConnection,
-    input: GenerationInput,
-    signal: AbortSignal,
-  ): Promise<DirectTrack[]>;
-}
-
-export type MusicProvider = JobMusicProvider | DirectMusicProvider;
 
 export type AssistRequest = Omit<AssistBody, 'connectionId'> & {
   model: string;
