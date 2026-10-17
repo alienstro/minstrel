@@ -17,29 +17,35 @@ for (const [network, prefix] of [
 ] as const) {
   blocked.addSubnet(network, prefix, 'ipv4');
 }
+// IPv6 is an allowlist: only global unicast 2000::/3 can pass, minus these special ranges inside it.
+// All other IPv6 forms, such as NAT64, IPv4-compatible, unique local, and link-local, are blocked.
 for (const [network, prefix] of [
-  ['::', 128], // unspecified
-  ['::1', 128], // loopback
-  ['64:ff9b::', 96], // NAT64, which can embed a private IPv4 address
+  ['2001::', 23], // IETF special use, includes Teredo 2001::/32
+  ['2001:db8::', 32], // documentation
   ['2002::', 16], // 6to4, which can embed a private IPv4 address
-  ['fc00::', 7], // unique local, includes the AWS metadata address fd00:ec2::254
-  ['fe80::', 10], // link-local
-  ['ff00::', 8], // multicast
+  ['3fff::', 20], // documentation
 ] as const) {
   blocked.addSubnet(network, prefix, 'ipv6');
 }
 
 export function isBlockedAddress(ip: string): boolean {
   if (isIPv4(ip)) return blocked.check(ip, 'ipv4');
-  if (!isIPv6(ip)) return true; // Fail closed on anything that is not an IP address.
-  const mapped = mappedIPv4(ip);
+  // Fail closed on anything that is not a plain IP address, a zone ID (%eth0) included.
+  if (!isIPv6(ip) || ip.includes('%')) return true;
+  const groups = expandIPv6(ip);
+  if (
+    groups.length !== 8 ||
+    groups.some((g) => !Number.isInteger(g) || g < 0 || g > 0xffff)
+  )
+    return true;
+  const mapped = mappedIPv4(groups);
   if (mapped) return blocked.check(mapped, 'ipv4');
+  if ((groups[0]! & 0xe000) !== 0x2000) return true;
   return blocked.check(ip, 'ipv6');
 }
 
 // Gives the IPv4 address inside an IPv4-mapped IPv6 address (::ffff:a.b.c.d or ::ffff:XXXX:XXXX).
-function mappedIPv4(ip: string): string | undefined {
-  const groups = expandIPv6(ip);
+function mappedIPv4(groups: number[]): string | undefined {
   if (!groups.slice(0, 5).every((g) => g === 0) || groups[5] !== 0xffff)
     return undefined;
   const [hi, lo] = [groups[6]!, groups[7]!];
@@ -47,7 +53,7 @@ function mappedIPv4(ip: string): string | undefined {
 }
 
 function expandIPv6(ip: string): number[] {
-  let text = ip.toLowerCase().split('%')[0]!;
+  let text = ip.toLowerCase();
   const dotted = text.match(/(\d+\.\d+\.\d+\.\d+)$/);
   if (dotted) {
     const [a, b, c, d] = dotted[1]!.split('.').map(Number) as [
