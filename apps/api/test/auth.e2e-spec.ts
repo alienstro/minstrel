@@ -61,6 +61,27 @@ describe('auth (e2e)', () => {
     expect(rows).toHaveLength(0);
   });
 
+  // An account from before Google-only sign-in still has a password. Production must not accept it.
+  it('outside fake mode, an old password account cannot sign in or ask for a reset', async () => {
+    expect((await signUp(t, 'ada@example.com')).status).toBe(200);
+    await t.app.close();
+    t = await createTestApp({ fakeMode: false });
+    const server = t.app.getHttpServer();
+
+    const signInRes = await request(server)
+      .post('/api/auth/sign-in/email')
+      .set('Origin', TEST_ORIGIN)
+      .send({ email: 'ada@example.com', password: 'correct horse battery' });
+    expect(signInRes.status).toBe(400);
+    expect(([] as string[]).concat(signInRes.headers['set-cookie'] ?? []).some((c) => c.includes('session_token='))).toBe(false);
+
+    const resetRes = await request(server)
+      .post('/api/auth/request-password-reset')
+      .set('Origin', TEST_ORIGIN)
+      .send({ email: 'ada@example.com', redirectTo: '/reset-password' });
+    expect(resetRes.status).toBe(400);
+  });
+
   it('the session cookie is HttpOnly and SameSite=Lax', async () => {
     const res = await signUp(t, 'ada@example.com');
     const cookies = ([] as string[]).concat(res.headers['set-cookie'] ?? []);
