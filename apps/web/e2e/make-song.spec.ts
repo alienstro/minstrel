@@ -1,34 +1,16 @@
 import { expect, test } from '@playwright/test';
-import pg from 'pg';
-import { TEST_DATABASE_URL } from '../playwright.config';
+import { WEB } from '../playwright.config';
 
-// The fake setup sends no email, so the test confirms the email in the database.
-async function markVerified(email: string) {
-  const client = new pg.Client({ connectionString: TEST_DATABASE_URL });
-  await client.connect();
-  try {
-    await client.query('UPDATE "user" SET email_verified = true WHERE email = $1', [email]);
-  } finally {
-    await client.end();
-  }
-}
-
+// Users sign in with Google. A test cannot use Google, so fake mode allows a password sign-up
+// through the API. The page shares its cookies with page.request.
 test('sign up, add a fake connection, make a song, and play it', async ({ page }) => {
   const email = `e2e-${Date.now()}@example.com`;
-  const password = 'correct horse battery';
-
-  await page.goto('/sign-up');
-  await page.getByLabel('Name').fill('Ada');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page.getByRole('status')).toContainText('Check your email');
-  await markVerified(email);
-
-  await page.goto('/sign-in');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Password').fill(password);
-  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  const signUp = await page.request.post('/api/auth/sign-up/email', {
+    headers: { Origin: WEB },
+    data: { name: 'Ada', email, password: 'correct horse battery' },
+  });
+  expect(signUp.ok()).toBe(true);
+  await page.goto('/studio');
   await page.waitForURL('**/studio');
 
   await page.goto('/settings/connections');

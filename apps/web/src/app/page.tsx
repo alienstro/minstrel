@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Mrs_Saint_Delafield } from 'next/font/google';
+import { Suspense } from 'react';
 import { AuthForm } from '@/components/auth/auth-form';
 import { photoStyle } from '@/components/brand/sticker-columns';
 import { HomeHero } from '@/components/home/home-hero';
@@ -28,7 +29,9 @@ export default function Home() {
             Your keys. Your songs.<span className="serif">Start a song</span>
           </h2>
           <div className="mx-auto mt-10 max-w-[760px]">
-            <AuthForm mode="sign-in" bare />
+            <Suspense>
+              <AuthForm bare />
+            </Suspense>
           </div>
         </section>
 

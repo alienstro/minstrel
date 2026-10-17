@@ -1,0 +1,78 @@
+/* The Google button is a record: a black pill with a white label disc. The disc turns while the
+   browser goes to Google. */
+.auth-google {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 0 28px 0 8px;
+  border: none;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ffffff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--card-shadow);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.record-btn:hover:not(:disabled) {
+  transform: scale(1.03);
+}
+
+.record-btn:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.record-btn:disabled {
+  cursor: progress;
+}
+
+/* The label disc. The two rings are the grooves at the edge of a record label. */
+.record-label {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow:
+    0 0 0 3px var(--ink),
+    0 0 0 4px rgb(255 255 255 / 25%);
+}
+
+.record-btn[aria-busy='true'] .record-label {
+  animation: record-turn 1.8s linear infinite;
+}
+
+@keyframes record-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .record-btn,
+  .record-btn[aria-busy='true'] .record-label {
+    transition: none;
+    animation: none;
+  }
+}
+
+.auth-note {
+  max-width: 44ch;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.7;
+  text-align: center;
+}
