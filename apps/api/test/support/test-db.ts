@@ -4,9 +4,12 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import pg from 'pg';
 
 export const TEST_DATABASE_URL =
-  process.env.TEST_DATABASE_URL ?? 'postgres://minstrel:minstrel@localhost:5433/minstrel_test';
+  process.env.TEST_DATABASE_URL ??
+  'postgres://minstrel:minstrel@localhost:5433/minstrel_test';
 
-const migrationsFolder = fileURLToPath(new URL('../../drizzle', import.meta.url));
+const migrationsFolder = fileURLToPath(
+  new URL('../../drizzle', import.meta.url),
+);
 let migrated: Promise<void> | undefined;
 
 // Runs the migrations one time for each test process, then empties every app table.

@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ApiExceptionFilter } from './common/api-exception.filter.js';
+import { BackgroundWorkModule } from './common/background-work.js';
 import { loggerOptions } from './common/logger.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { PgThrottlerStorage } from './common/pg-throttler.storage.js';
@@ -32,6 +33,7 @@ class MailerModule {}
   imports: [
     LoggerModule.forRoot({ pinoHttp: loggerOptions() }),
     DbModule,
+    BackgroundWorkModule,
     // Each limited route sets its own limit with @Throttle (spec §7.4). The default is only a fallback.
     ThrottlerModule.forRootAsync({
       inject: [DB],
