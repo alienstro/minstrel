@@ -2,6 +2,8 @@ import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import type { Db } from '../db/db.module.js';
 import * as authSchema from '../db/auth-schema.js';
+import { userPrefix } from '../storage/object-key.js';
+import type { AudioStore } from '../storage/audio-store.js';
 import type { Mailer } from './mailer.js';
 
 export interface AuthEnv {
@@ -12,7 +14,7 @@ export interface AuthEnv {
 }
 
 // Spec §7.2 and §7.4.
-export function createAuth(db: Db, env: AuthEnv, mailer: Mailer) {
+export function createAuth(db: Db, env: AuthEnv, mailer: Mailer, audio: AudioStore) {
   const google =
     env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
       ? {
@@ -44,6 +46,16 @@ export function createAuth(db: Db, env: AuthEnv, mailer: Mailer) {
       },
     },
     socialProviders: google,
+    user: {
+      deleteUser: {
+        enabled: true,
+        // The R2 objects go first. When R2 fails, the hook throws and the user row stays, so the
+        // user can try again. The database cascades then remove connections, generations, and tracks.
+        beforeDelete: async (user) => {
+          await audio.deletePrefix(userPrefix(user.id));
+        },
+      },
+    },
     rateLimit: { enabled: true, storage: 'database' },
     advanced: {
       useSecureCookies: env.WEB_ORIGIN.startsWith('https://'),

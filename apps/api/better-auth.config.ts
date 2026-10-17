@@ -7,6 +7,14 @@ const noMail = {
   sendPasswordReset: async () => {},
 };
 
+// The CLI only reads the schema. It never deletes a user, so the store does nothing.
+const noAudio = {
+  put: async () => {},
+  delete: async () => {},
+  deletePrefix: async () => {},
+  signedUrl: async () => '',
+};
+
 export const auth = createAuth(
   drizzle.mock(),
   {
@@ -14,4 +22,5 @@ export const auth = createAuth(
     BETTER_AUTH_SECRET: 'cli-only-secret-cli-only-secret-00',
   },
   noMail,
+  noAudio,
 );

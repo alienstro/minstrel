@@ -19,6 +19,7 @@ import { ConnectionsModule } from './connections/connections.module.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
 import { GenerationsModule } from './generations/generations.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
+import { AUDIO_STORE, type AudioStore } from './storage/audio-store.js';
 import { StorageModule } from './storage/storage.module.js';
 import { TracksModule } from './tracks/tracks.module.js';
 
@@ -70,9 +71,9 @@ class MailerModule {}
     // The module registers a global guard: each route needs a session unless it has @AllowAnonymous.
     AuthModule.forRootAsync({
       imports: [MailerModule],
-      inject: [DB, MAILER],
-      useFactory: (db: Db, mailer: Mailer) => ({
-        auth: createAuth(db, authEnvFromProcess(), mailer),
+      inject: [DB, MAILER, AUDIO_STORE],
+      useFactory: (db: Db, mailer: Mailer, audio: AudioStore) => ({
+        auth: createAuth(db, authEnvFromProcess(), mailer, audio),
         bodyParser: {
           json: { type: parseUnlessWebhook('application/json') },
           urlencoded: { type: parseUnlessWebhook('application/x-www-form-urlencoded') },
