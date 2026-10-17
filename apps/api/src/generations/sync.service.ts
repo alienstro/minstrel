@@ -1,4 +1,4 @@
-import type { MusicAdapter } from '@minstrel/shared';
+import { fallbackTitle, type MusicAdapter } from '@minstrel/shared';
 import { Inject, Injectable } from '@nestjs/common';
 import { eq, sql } from 'drizzle-orm';
 import { ApiError } from '../common/api-error.js';
@@ -119,7 +119,7 @@ export class SyncService {
     // One INSERT cannot update the same row twice, so each provider track goes in one time.
     const unique = [...new Map(list.map((t) => [t.providerTrackId, t])).values()];
     if (unique.length === 0) return [];
-    const fallbackTitle = row.input.title || row.input.idea.slice(0, 80);
+    const title = fallbackTitle(row.input);
     return tx
       .insert(tracks)
       .values(
@@ -127,7 +127,7 @@ export class SyncService {
           generationId: row.id,
           userId: row.userId,
           providerTrackId: t.providerTrackId,
-          title: t.title || fallbackTitle,
+          title: t.title || title,
           style: row.input.style ?? null,
           lyrics: row.input.lyrics ?? null,
           durationSeconds: t.durationSeconds ?? null,

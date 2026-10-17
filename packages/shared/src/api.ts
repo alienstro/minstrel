@@ -80,21 +80,27 @@ export interface ModelOption {
 
 // Assist (spec §6)
 
-export const assistBodySchema = z.object({
-  connectionId: z.uuid(),
-  task: z.enum(['lyrics', 'style', 'title']),
-  /** The model to use. Without it, the connection's default model. */
-  model: z.string().trim().min(1).max(200).optional(),
-  idea: z.string().trim().min(1).max(3000),
-  fields: z
-    .object({
-      lyrics: z.string().max(5000),
-      style: z.string().max(1000),
-      title: z.string().max(80),
-    })
-    .partial()
-    .default({}),
-});
+export const assistBodySchema = z
+  .object({
+    connectionId: z.uuid(),
+    task: z.enum(['lyrics', 'style', 'title']),
+    /** The model to use. Without it, the connection's default model. */
+    model: z.string().trim().min(1).max(200).optional(),
+    /** Write lyrics always needs it. Suggest can work from the lyrics instead. */
+    idea: z.string().trim().min(1).max(3000).optional(),
+    fields: z
+      .object({
+        lyrics: z.string().max(5000),
+        style: z.string().max(1000),
+        title: z.string().max(80),
+      })
+      .partial()
+      .default({}),
+  })
+  .refine((body) => Boolean(body.idea) || (body.task !== 'lyrics' && Boolean(body.fields.lyrics?.trim())), {
+    path: ['idea'],
+    message: 'Describe the song first.',
+  });
 export type AssistBody = z.infer<typeof assistBodySchema>;
 
 export const assistResultSchema = z.object({ text: z.string().min(1) });

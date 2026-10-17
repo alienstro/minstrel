@@ -123,6 +123,22 @@ describe('KieMusicProvider', () => {
     });
   });
 
+  it('lyrics without an idea or a title use custom mode with the first sung line as the title', async () => {
+    const { fetch, calls } = fakeFetch(json(createOk));
+    await new KieMusicProvider(fetch).submit(conn, {
+      lyrics: '[Verse]\nThe cat set sail',
+      instrumental: false,
+      model: 'V6',
+    });
+    expect(calls[0]!.body.input).toEqual({
+      custom_mode: true,
+      instrumental: false,
+      model: 'V6',
+      title: 'The cat set sail',
+      lyrics: '[Verse]\nThe cat set sail',
+    });
+  });
+
   it('a length goes out as duration in custom mode only, as kie.ai allows', async () => {
     const { fetch, calls } = fakeFetch(json(createOk), json(createOk));
     const provider = new KieMusicProvider(fetch);

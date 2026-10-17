@@ -38,13 +38,18 @@ export class AssistService {
   private async assistWithMusic(
     conn: DecryptedConnection,
     task: AssistBody['task'],
-    idea: string,
+    idea: string | undefined,
   ): Promise<AssistResult> {
     const provider = this.registry.music(conn.adapter as MusicAdapter);
     if (task !== 'lyrics' || !provider.writeLyrics) {
       const helper = task === 'lyrics' ? 'Write lyrics' : 'Suggest';
       const message = `${helper} needs a text provider key, for example OpenRouter.`;
       throw new ApiError(400, 'invalid_input', message, { connectionId: message });
+    }
+    // assistBodySchema already asks Write lyrics for an idea. This check only narrows the type.
+    if (!idea) {
+      const message = 'Describe the song first.';
+      throw new ApiError(400, 'invalid_input', message, { idea: message });
     }
     return { text: await provider.writeLyrics(conn, idea) };
   }
