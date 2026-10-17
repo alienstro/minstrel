@@ -49,10 +49,13 @@ export function ModelPicker({
   groups,
   value,
   onPick,
+  errorId,
 }: {
   groups: ModelGroup[];
   value: ModelValue | null;
   onPick: (value: ModelValue) => void;
+  /** The ID of the error text below the picker, when the model has an error (spec §10.3). */
+  errorId?: string;
 }) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
@@ -167,6 +170,7 @@ export function ModelPicker({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-labelledby={`${baseId}-label ${baseId}-value`}
+        aria-describedby={errorId}
         onClick={() => (isOpen ? setIsOpen(false) : openPanel())}
       >
         <span id={`${baseId}-value`}>{selected ? `${selected.model.label} · ${selected.connectionLabel}` : 'Choose a model'}</span>

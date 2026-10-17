@@ -56,6 +56,16 @@ describe('SongForm', () => {
     vi.restoreAllMocks();
   });
 
+  it('the model error describes the model picker', async () => {
+    fakeApi({});
+    const noModels = Object.fromEntries(Object.keys(models).map((id) => [id, []]));
+    renderWithQuery(<SongForm connections={connections} providers={providers} models={noModels} onCreated={vi.fn()} />);
+    await userEvent.click(screen.getByRole('button', { name: /make song/i }));
+    expect(screen.getByText('Choose a model.')).toBeInTheDocument();
+    const picker = screen.getByRole('button', { name: /^model/i });
+    expect(picker).toHaveAccessibleDescription('Choose a model.');
+  });
+
   it('an ElevenLabs model shows the Length slider with min 5, max 180, step 5, value 150', async () => {
     renderForm();
     await pickModel('music');

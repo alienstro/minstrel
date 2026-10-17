@@ -194,7 +194,12 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
           </label>
         ) : null}
         <div>
-          <ModelPicker groups={groups} value={model} onPick={setModel} />
+          <ModelPicker
+            groups={groups}
+            value={model}
+            onPick={setModel}
+            errorId={errors.model ? 'song-model-error' : undefined}
+          />
           {errors.model ? <FieldError id="song-model-error">{errors.model}</FieldError> : null}
         </div>
       </div>
