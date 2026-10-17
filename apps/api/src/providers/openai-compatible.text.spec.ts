@@ -85,6 +85,18 @@ describe('OpenAiCompatibleTextProvider', () => {
     expect(JSON.stringify(calls[1]!.body.messages)).toContain('JSON');
   });
 
+  it('Suggest with lyrics and no idea sends the lyrics and no Idea line', async () => {
+    const { fetch, calls } = fakeFetch(reply('{"text":"Tin Roof"}'));
+    await new OpenAiCompatibleTextProvider(fetch).complete(conn, {
+      task: 'title',
+      fields: { lyrics: '[Verse]\nDrip drop' },
+      model: 'gpt-x',
+    });
+    const user = calls[0]!.body.messages.at(-1).content as string;
+    expect(user).toContain('Lyrics so far:\n[Verse]\nDrip drop');
+    expect(user).not.toContain('Idea:');
+  });
+
   it('a reply that fails the schema gives provider_rejected', async () => {
     const { fetch } = fakeFetch(reply('{"lyrics":"no text field"}'));
     await expect(

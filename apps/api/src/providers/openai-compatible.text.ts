@@ -29,10 +29,10 @@ const INSTRUCTIONS: Record<AssistRequest['task'], string> = {
     'Write song lyrics for the idea. Mark each part in square brackets, for example [Verse] and [Chorus]. ' +
     'Keep the lyrics under 3000 characters.',
   style:
-    'Write a short music style for the idea: genres, mood, instruments, tempo, and voice. ' +
+    'Write a short music style for the song: genres, mood, instruments, tempo, and voice. ' +
     'Use a comma-separated list under 200 characters.',
   title:
-    'Write one short song title for the idea, under 60 characters, with no quotation marks.',
+    'Write one short song title for the song, under 60 characters, with no quotation marks.',
 };
 
 const RESPONSE_FORMAT = {
@@ -167,7 +167,8 @@ export class OpenAiCompatibleTextProvider implements TextProvider {
 }
 
 function userMessage(request: AssistRequest): string {
-  const lines = [`Idea: ${request.idea}`];
+  // Suggest can work from the lyrics alone, so the idea is optional.
+  const lines = request.idea ? [`Idea: ${request.idea}`] : [];
   if (request.fields.style) lines.push(`Style: ${request.fields.style}`);
   if (request.fields.title) lines.push(`Title: ${request.fields.title}`);
   if (request.fields.lyrics)

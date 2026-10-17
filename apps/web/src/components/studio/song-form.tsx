@@ -26,6 +26,14 @@ interface Props {
 
 type Task = AssistBody['task'];
 type Errors = Record<string, string>;
+type Mode = 'describe' | 'lyrics';
+
+// The same two modes as Suno. Describe: the provider writes the lyrics and the music from the idea.
+// Lyrics: the provider uses the lyrics, style, and title of the user.
+const MODES: { id: Mode; label: string }[] = [
+  { id: 'describe', label: 'Describe' },
+  { id: 'lyrics', label: 'Lyrics' },
+];
 
 // The error keys that the form shows next to a field.
 const SHOWN_FIELDS = new Set(['idea', 'model', 'helperModel', 'lyrics', 'style', 'title']);
@@ -53,6 +61,9 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   const [helperModel, setHelperModel] = useState<ModelValue | null>(() =>
     textConnection?.defaultModel ? { connectionId: textConnection.id, modelId: textConnection.defaultModel } : null,
   );
+  const [mode, setMode] = useState<Mode>('describe');
+  // Write lyrics opens a box for the idea. The box shares the idea with Describe.
+  const [briefOpen, setBriefOpen] = useState(false);
   const [idea, setIdea] = useState('');
   const [lyrics, setLyrics] = useState('');
   const [style, setStyle] = useState('');
@@ -67,11 +78,17 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   const caps = providers.find((p) => p.adapter === connection?.adapter)?.capabilities ?? null;
   const range = caps?.lengthSeconds ?? null;
   const providerName = providers.find((p) => p.adapter === connection?.adapter)?.displayName ?? 'This provider';
+  const showLyrics = caps?.lyrics ?? true;
+  const showStyle = caps?.style ?? true;
+  const lyricsMode = showLyrics && mode === 'lyrics';
+  const isInstrumental = Boolean(caps?.instrumental ?? true) && instrumental;
   // The same rule as sunoMode on the API: custom mode needs lyrics, or an instrumental with a style.
-  const customMode = caps?.instrumental && instrumental ? Boolean(style.trim()) : Boolean(lyrics.trim());
+  const customMode = lyricsMode && (isInstrumental ? Boolean(style.trim()) : Boolean(lyrics.trim()));
   const lengthFits = !caps?.lengthNeedsCustomMode || customMode;
+  // Describe never keeps a length on such a provider, so the form does not show the slider there.
+  const showLength = range !== null && (lyricsMode || !caps?.lengthNeedsCustomMode);
   const lengthAutoOn = Boolean(caps?.lengthAuto) && autoLength;
-  const lengthOn = range !== null && !lengthAutoOn && lengthFits;
+  const lengthOn = showLength && !lengthAutoOn && lengthFits;
 
   const create = useMutation({
     mutationFn: (body: CreateGenerationBody) =>
@@ -87,13 +104,24 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     // The ref stops a second request before React shows the disabled button.
     if (submitting.current || create.isPending) return;
     if (!model || !caps) return setErrors({ model: 'Choose a model.' });
-    if (!idea.trim()) return setErrors({ idea: 'Describe the song first.' });
+    if (!lyricsMode && !idea.trim()) return setErrors({ idea: 'Describe the song first.' });
+    if (lyricsMode && isInstrumental && !style.trim()) return setErrors({ style: 'Add a style for the instrumental.' });
+    if (lyricsMode && !isInstrumental && !lyrics.trim()) return setErrors({ lyrics: 'Add the lyrics, or use Write lyrics.' });
     setErrors({});
     submitting.current = true;
     try {
       const generation = await create.mutateAsync({
         connectionId: model.connectionId,
-        input: buildInput(caps, { idea, lyrics, style, title, instrumental, length: lengthOn ? length : null, model: model.modelId }),
+        input: buildInput(caps, {
+          lyricsMode,
+          idea,
+          lyrics,
+          style,
+          title,
+          instrumental,
+          length: lengthOn ? length : null,
+          model: model.modelId,
+        }),
       });
       onCreated(generation);
     } catch (error) {
@@ -107,7 +135,10 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     // Without a text key, Write lyrics uses the music connection of the chosen model (kie.ai).
     const target = textConnection ?? (task === 'lyrics' ? connection : undefined);
     if (!target) return;
-    if (!idea.trim()) return setErrors({ idea: 'Describe the song first.' });
+    // The idea goes only when its box is open. Suggest can work from the lyrics alone.
+    const brief = briefOpen ? idea.trim() : '';
+    if (task === 'lyrics' && !brief) return setErrors({ idea: 'Describe the song first.' });
+    if (task !== 'lyrics' && !brief && !lyrics.trim()) return setErrors({ lyrics: 'Add the lyrics first.' });
     if (textConnection && !helperModel) return setErrors({ helperModel: 'Choose a helper model.' });
     setErrors({});
     try {
@@ -115,7 +146,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         connectionId: target.id,
         ...(textConnection && helperModel ? { model: helperModel.modelId } : {}),
         task,
-        idea,
+        ...(brief ? { idea: brief } : {}),
         fields: { lyrics, style, title },
       });
       fill(result.text);
@@ -126,22 +157,102 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
 
   const helperDisabled = !textConnection || assist.isPending;
   const writeLyricsDisabled = (!textConnection && !connection) || assist.isPending;
-  const showLyrics = caps?.lyrics ?? true;
-  const showStyle = caps?.style ?? true;
 
   return (
     <form noValidate onSubmit={onSubmit} aria-label="New song" className="flex flex-col gap-6">
-      <Field id="song-idea" label="What is the song about?" error={errors.idea}>
-        <textarea
-          id="song-idea"
-          className="idea"
-          rows={2}
-          placeholder="A sea shanty about a lost cat"
-          value={idea}
-          onChange={(e) => setIdea(e.target.value)}
-          {...describedBy('song-idea', errors.idea)}
-        />
-      </Field>
+      {showLyrics ? (
+        <div className="flex flex-col gap-2">
+          <div role="group" aria-label="How to make the song" className="flex flex-wrap gap-1.5">
+            {MODES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`pill min-h-9 px-4 text-[12px] uppercase ${item.id === mode ? 'dark' : 'gl'}`}
+                aria-pressed={item.id === mode}
+                onClick={() => {
+                  setMode(item.id);
+                  setErrors({});
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="hint pl-5">
+            {lyricsMode
+              ? `${providerName} uses your lyrics, style, and title.`
+              : `${providerName} writes the ${isInstrumental ? 'music' : 'lyrics and the music'} from your idea.`}
+          </p>
+        </div>
+      ) : null}
+
+      {lyricsMode ? (
+        <Field
+          id="song-lyrics"
+          label="Lyrics"
+          error={errors.lyrics}
+          action={
+            <button
+              type="button"
+              className="txt"
+              aria-expanded={briefOpen}
+              aria-controls="song-brief-box"
+              disabled={writeLyricsDisabled || isInstrumental}
+              onClick={() => setBriefOpen((open) => !open)}
+            >
+              Write lyrics
+            </button>
+          }
+        >
+          {briefOpen ? (
+            <div id="song-brief-box" className="flex flex-col gap-2">
+              <label htmlFor="song-brief" className="hint pl-5">
+                What are the lyrics about?
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  id="song-brief"
+                  className="in min-w-0 flex-[1_1_240px]"
+                  placeholder="A sea shanty about a lost cat"
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                  {...describedBy('song-brief', errors.idea)}
+                />
+                <button type="button" className="pill dark" disabled={writeLyricsDisabled} onClick={() => help('lyrics', setLyrics)}>
+                  {assist.isPending ? 'Writing…' : 'Write'}
+                </button>
+              </div>
+              {errors.idea ? (
+                <div className="pl-5">
+                  <FieldError id="song-brief-error">{errors.idea}</FieldError>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <textarea
+            id="song-lyrics"
+            className="in rounded-[24px] px-5 py-4 leading-[1.7]"
+            rows={7}
+            value={lyrics}
+            disabled={isInstrumental}
+            placeholder={isInstrumental ? 'An instrumental has no lyrics.' : undefined}
+            onChange={(e) => setLyrics(e.target.value)}
+            {...describedBy('song-lyrics', errors.lyrics)}
+          />
+        </Field>
+      ) : (
+        <Field id="song-idea" label="What is the song about?" error={errors.idea}>
+          <textarea
+            id="song-idea"
+            className="idea"
+            rows={2}
+            placeholder="A sea shanty about a lost cat"
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            {...describedBy('song-idea', errors.idea)}
+          />
+        </Field>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 max-w-[440px] flex-[1_1_280px]">
@@ -165,7 +276,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         ) : null}
       </div>
 
-      {textConnection ? (
+      {textConnection && lyricsMode ? (
         <div className="min-w-0 max-w-[440px]">
           <ModelPicker
             groups={helperGroups}
@@ -185,7 +296,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         </div>
       ) : null}
 
-      {range ? (
+      {showLength && range ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3 pr-5">
             <label htmlFor="song-length" className="lbl">
@@ -234,72 +345,51 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         </div>
       ) : null}
 
-      {showLyrics ? (
-        <Field
-          id="song-lyrics"
-          label="Lyrics"
-          error={errors.lyrics}
-          action={
-            <button type="button" className="txt" disabled={writeLyricsDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
-              Write lyrics
-            </button>
-          }
-        >
-          <textarea
-            id="song-lyrics"
-            className="in rounded-[24px] px-5 py-4 leading-[1.7]"
-            rows={7}
-            value={lyrics}
-            disabled={instrumental}
-            onChange={(e) => setLyrics(e.target.value)}
-            {...describedBy('song-lyrics', errors.lyrics)}
-          />
-        </Field>
-      ) : null}
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {showStyle ? (
+      {lyricsMode ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {showStyle ? (
+            <Field
+              id="song-style"
+              label="Style"
+              error={errors.style}
+              action={
+                <button type="button" aria-label="Suggest a style" className="txt" disabled={helperDisabled} onClick={() => help('style', setStyle)}>
+                  Suggest
+                </button>
+              }
+            >
+              <input
+                id="song-style"
+                className="in"
+                placeholder="shanty, accordion"
+                value={style}
+                onChange={(e) => setStyle(e.target.value)}
+                {...describedBy('song-style', errors.style)}
+              />
+            </Field>
+          ) : null}
           <Field
-            id="song-style"
-            label="Style"
-            error={errors.style}
+            id="song-title"
+            label="Title"
+            error={errors.title}
             action={
-              <button type="button" aria-label="Suggest a style" className="txt" disabled={helperDisabled} onClick={() => help('style', setStyle)}>
+              <button type="button" aria-label="Suggest a title" className="txt" disabled={helperDisabled} onClick={() => help('title', setTitle)}>
                 Suggest
               </button>
             }
           >
             <input
-              id="song-style"
+              id="song-title"
               className="in"
-              placeholder="shanty, accordion"
-              value={style}
-              onChange={(e) => setStyle(e.target.value)}
-              {...describedBy('song-style', errors.style)}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              {...describedBy('song-title', errors.title)}
             />
           </Field>
-        ) : null}
-        <Field
-          id="song-title"
-          label="Title"
-          error={errors.title}
-          action={
-            <button type="button" aria-label="Suggest a title" className="txt" disabled={helperDisabled} onClick={() => help('title', setTitle)}>
-              Suggest
-            </button>
-          }
-        >
-          <input
-            id="song-title"
-            className="in"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            {...describedBy('song-title', errors.title)}
-          />
-        </Field>
-      </div>
+        </div>
+      ) : null}
 
-      {!textConnection ? (
+      {lyricsMode && !textConnection ? (
         <p className="hint">
           {connection
             ? `Write lyrics uses ${providerName}. Add a text key in Settings to use Suggest.`
@@ -365,16 +455,27 @@ const clamp = (value: number, range: { min: number; max: number }) => Math.min(r
 
 const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-// Only the fields that the provider uses go out. A title always goes, because Minstrel keeps it.
+// Only the fields of the chosen mode that the provider uses go out. Describe sends only the idea,
+// because the provider writes the rest. Lyrics sends no idea, because the provider does not use it.
 function buildInput(
   caps: MusicCapabilities,
   /** `length` is null when Auto is on, or when the provider would not keep the length. */
-  form: { idea: string; lyrics: string; style: string; title: string; instrumental: boolean; length: number | null; model: string },
+  form: {
+    lyricsMode: boolean;
+    idea: string;
+    lyrics: string;
+    style: string;
+    title: string;
+    instrumental: boolean;
+    length: number | null;
+    model: string;
+  },
 ): GenerationInput {
-  const input: GenerationInput = { idea: form.idea.trim(), instrumental: caps.instrumental && form.instrumental, model: form.model };
-  if (caps.lyrics && !input.instrumental && form.lyrics.trim()) input.lyrics = form.lyrics;
-  if (caps.style && form.style.trim()) input.style = form.style.trim();
-  if (form.title.trim()) input.title = form.title.trim();
+  const input: GenerationInput = { instrumental: caps.instrumental && form.instrumental, model: form.model };
+  if (!form.lyricsMode) input.idea = form.idea.trim();
+  if (form.lyricsMode && caps.lyrics && !input.instrumental && form.lyrics.trim()) input.lyrics = form.lyrics;
+  if (form.lyricsMode && caps.style && form.style.trim()) input.style = form.style.trim();
+  if (form.lyricsMode && form.title.trim()) input.title = form.title.trim();
   if (caps.lengthSeconds && form.length !== null) input.lengthSeconds = clamp(form.length, caps.lengthSeconds);
   return input;
 }

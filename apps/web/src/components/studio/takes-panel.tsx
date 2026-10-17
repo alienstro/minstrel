@@ -1,6 +1,6 @@
 'use client';
 
-import type { GenerationDto, GenerationStatus, TrackDto } from '@minstrel/shared';
+import { fallbackTitle, type GenerationDto, type GenerationStatus, type TrackDto } from '@minstrel/shared';
 import { Logo } from '@/components/brand/logo';
 import { usePlayer } from '@/components/player/player-context';
 import { useGeneration } from '@/hooks/use-generation';
@@ -39,7 +39,7 @@ function TakeGroup({ initial }: { initial: GenerationDto }) {
   const generation = data ?? initial;
 
   return (
-    <article className="flex flex-col gap-3" aria-label={generation.input.title || generation.input.idea}>
+    <article className="flex flex-col gap-3" aria-label={fallbackTitle(generation.input)}>
       {generation.tracks.length > 0 ? <TakeList tracks={generation.tracks} /> : null}
       {generation.status === 'failed' ? (
         <p role="alert" className="mono m-0 text-[11px] font-semibold">

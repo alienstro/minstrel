@@ -1,10 +1,10 @@
-import type { GenerationInput } from '@minstrel/shared';
+import { fallbackTitle, type GenerationInput } from '@minstrel/shared';
 
 export interface SunoMode {
   custom: boolean;
   /** The lyrics to sing. None for an instrumental. */
   lyrics?: string;
-  /** Custom mode needs a title: the user's title, or the start of the idea. */
+  /** Custom mode needs a title: the user's title, or a fallback from the idea or the lyrics. */
   title: string;
 }
 
@@ -15,6 +15,6 @@ export function sunoMode(input: GenerationInput): SunoMode {
   return {
     custom: Boolean(lyrics) || (input.instrumental && Boolean(input.style)),
     lyrics,
-    title: input.title || input.idea.slice(0, 80),
+    title: fallbackTitle(input),
   };
 }
