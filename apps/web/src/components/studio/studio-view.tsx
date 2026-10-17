@@ -1,13 +1,34 @@
 'use client';
 
-import type { GenerationDto, ModelOption } from '@minstrel/shared';
+import type { GenerationDto, ModelOption, Page } from '@minstrel/shared';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { connectionsQuery, providersQuery } from '@/components/connections/connection-list';
+import { isFinished } from '@/hooks/use-generation';
 import { apiFetch } from '@/lib/api';
 import { SongForm } from './song-form';
 import { TakesPanel } from './takes-panel';
+
+// Spec §5.3 step 4: the Takes panel reads GET /api/generations, so a reload keeps the songs in
+// progress. One read per visit is enough, because each take then polls its own row.
+const recentGenerationsQuery = {
+  queryKey: ['generations', 'recent'],
+  queryFn: () => apiFetch<Page<GenerationDto>>('/api/generations'),
+  staleTime: Infinity,
+};
+
+// The panel is not a second Library, so it keeps only the newest finished songs.
+const FINISHED_TAKES = 3;
+
+function takesToShow(created: GenerationDto[], recent: GenerationDto[]): GenerationDto[] {
+  const createdIds = new Set(created.map((g) => g.id));
+  let finished = 0;
+  const seeded = recent.filter(
+    (g) => !createdIds.has(g.id) && (!isFinished(g.status) || finished++ < FINISHED_TAKES),
+  );
+  return [...created, ...seeded];
+}
 
 export function StudioView() {
   const connections = useQuery(connectionsQuery);
@@ -20,7 +41,8 @@ export function StudioView() {
       staleTime: 5 * 60_000,
     })),
   });
-  const [generations, setGenerations] = useState<GenerationDto[]>([]);
+  const recent = useQuery(recentGenerationsQuery);
+  const [created, setCreated] = useState<GenerationDto[]>([]);
 
   if (connections.isPending || providers.isPending || modelQueries.some((q) => q.isPending)) {
     return <p className="text-muted">Loading…</p>;
@@ -51,12 +73,12 @@ export function StudioView() {
           connections={connections.data}
           providers={providers.data}
           models={models}
-          onCreated={(g) => setGenerations((list) => [g, ...list])}
+          onCreated={(g) => setCreated((list) => [g, ...list])}
         />
       </section>
       <section className="card" aria-label="Takes">
         <span className="card-pill">Takes</span>
-        <TakesPanel generations={generations} />
+        <TakesPanel generations={takesToShow(created, recent.data?.items ?? [])} />
       </section>
     </div>
   );
