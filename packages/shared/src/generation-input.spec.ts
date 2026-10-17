@@ -28,20 +28,6 @@ describe('inputSchemaFor', () => {
     expect(ok('kie', { lengthSeconds: 361 })).toBe(false);
   });
 
-  it('suno_classic uses the kie limits', () => {
-    expect(ok('suno_classic', { title: 'a'.repeat(81) })).toBe(false);
-    expect(ok('suno_classic', { lengthSeconds: 360 })).toBe(true);
-    expect(ok('suno_classic', { lengthSeconds: 361 })).toBe(false);
-  });
-
-  it('elevenlabs accepts 5 and 180 and rejects 4 and 185', () => {
-    expect(ok('elevenlabs', { lengthSeconds: 5 })).toBe(true);
-    expect(ok('elevenlabs', { lengthSeconds: 180 })).toBe(true);
-    expect(ok('elevenlabs', { lengthSeconds: 4 })).toBe(false);
-    expect(ok('elevenlabs', { lengthSeconds: 185 })).toBe(false);
-    expect(ok('elevenlabs', { lengthSeconds: 30.5 })).toBe(false);
-  });
-
   it('an empty idea fails', () => {
     expect(ok('kie', { idea: '' })).toBe(false);
     expect(ok('kie', { idea: '   ' })).toBe(false);

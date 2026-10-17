@@ -3,7 +3,7 @@ import type { Adapter, MusicAdapter } from './adapters.js';
 import type { ApiErrorBody } from './errors.js';
 import type { GenerationInput } from './generation-input.js';
 
-const adapterSchema = z.enum(['kie', 'suno_classic', 'elevenlabs', 'openai_compatible']);
+const adapterSchema = z.enum(['kie', 'openai_compatible']);
 const httpsUrl = z.url({ protocol: /^https$/ });
 
 export interface Page<T> {
@@ -139,7 +139,6 @@ export interface GenerationDto {
   id: string;
   connectionId: string | null;
   adapter: MusicAdapter;
-  flow: 'job' | 'direct';
   status: GenerationStatus;
   input: GenerationInput;
   error: ApiErrorBody | null;
