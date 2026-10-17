@@ -22,11 +22,15 @@ import { ProviderRegistry } from '../providers/registry.js';
 import type { DecryptedConnection, JobMusicProvider } from '../providers/types.js';
 import { toGenerationDto } from './generation.dto.js';
 import { GenerationsRepo, type GenerationRow } from './generations.repo.js';
+import { DirectRunner } from './direct-runner.js';
 import { nextPollDelaySeconds } from './rules.js';
 import { SyncService } from './sync.service.js';
 
 const PAGE_SIZE = 20;
 const MAX_SYNCS_PER_LIST = 5;
+
+const isOpenDirect = (row: GenerationRow) =>
+  row.flow === 'direct' && (row.status === 'queued' || row.status === 'running');
 
 export const hashToken = (token: string): Buffer => createHash('sha256').update(token).digest();
 
@@ -41,6 +45,7 @@ export class GenerationsService {
     private readonly repo: GenerationsRepo,
     private readonly syncService: SyncService,
     private readonly background: BackgroundWork,
+    private readonly runner: DirectRunner,
   ) {
     const origin = process.env.WEB_ORIGIN;
     if (!origin) throw new Error('WEB_ORIGIN must be set');
@@ -57,10 +62,11 @@ export class GenerationsService {
     const provider = this.registry.music(conn.adapter as MusicAdapter);
     // Spec §5.1: the limits depend on the adapter of the connection.
     const input = provider.inputSchema.parse(rawInput);
-    if (provider.flow !== 'job') {
-      throw new ApiError(400, 'invalid_input', 'Minstrel does not support this music provider yet.');
-    }
-    return toGenerationDto(await this.submitJob(conn, provider, input));
+    const row =
+      provider.flow === 'job'
+        ? await this.submitJob(conn, provider, input)
+        : await this.submitDirect(conn, input);
+    return toGenerationDto(row);
   }
 
   // Spec §5.3 step 4. Vercel Cron runs once a day on Hobby, so the reads drive the poll. The reply
@@ -70,6 +76,7 @@ export class GenerationsService {
     const found = await this.repo.findForUser(id, userId);
     if (!found) throw notFound();
     if (found.due) this.scheduleSync(id);
+    if (isOpenDirect(found.row)) this.scheduleDirectWork(userId);
     return toGenerationDto(found.row, await this.repo.tracksOf([id]));
   }
 
@@ -78,6 +85,7 @@ export class GenerationsService {
     for (const due of await this.repo.dueJobGenerations(MAX_SYNCS_PER_LIST, userId)) {
       this.scheduleSync(due.id);
     }
+    if (rows.some(({ row }) => isOpenDirect(row))) this.scheduleDirectWork(userId);
     const trackRows = await this.repo.tracksOf(rows.slice(0, PAGE_SIZE).map((r) => r.row.id));
     return toPage(rows, PAGE_SIZE, (g) =>
       toGenerationDto(g, trackRows.filter((t) => t.generationId === g.id)),
@@ -86,6 +94,32 @@ export class GenerationsService {
 
   private scheduleSync(id: string): void {
     this.background.run(() => this.syncService.sync(id, { ifDue: true }));
+  }
+
+  // Spec §5.4 steps 3 and 4: a read marks a stopped direct call as interrupted, then starts the
+  // user's queued songs in this new function call.
+  private scheduleDirectWork(userId: string): void {
+    this.background.run(async () => {
+      await this.runner.expire(userId);
+      await this.runner.startQueued(userId);
+    });
+  }
+
+  // Spec §5.4 step 1. A queued row costs nothing. The start runs after the reply.
+  private async submitDirect(conn: DecryptedConnection, input: GenerationInput): Promise<GenerationRow> {
+    const [row] = await this.db
+      .insert(generations)
+      .values({
+        userId: conn.userId,
+        connectionId: conn.id,
+        adapter: conn.adapter,
+        flow: 'direct',
+        status: 'queued',
+        input,
+      })
+      .returning();
+    this.background.run(() => this.runner.start(row!.id));
+    return row!;
   }
 
   // Spec §5.3 step 1.

@@ -138,4 +138,14 @@ export class GenerationsRepo {
       .limit(limit);
     return rows.map((r) => r.id);
   }
+
+  /** Users with queued direct generations, for the sweep. */
+  async usersWithQueuedDirect(limit: number): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ userId: generations.userId })
+      .from(generations)
+      .where(and(eq(generations.flow, 'direct'), eq(generations.status, 'queued')))
+      .limit(limit);
+    return rows.map((r) => r.userId);
+  }
 }
