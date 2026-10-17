@@ -16,6 +16,11 @@ traffic back through it. The Dokploy panel stays on Tailscale (`http://100.105.2
 | Backups | Backup of `minstrel-db` | R2 bucket `minstrel-backups`, daily, 14 kept |
 | Tunnel | App `cloudflared` | Image `cloudflare/cloudflared`, command `tunnel run`, env `TUNNEL_TOKEN` |
 
+**Warning:** The server is an LXC container on Proxmox. Docker Swarm virtual IPs need the kernel IPVS
+load balancer, which does not work inside LXC, so Traefik gets "connection refused". Set
+**Endpoint Spec Mode** to `dnsrr` (Advanced, Swarm settings) on each new Dokploy app before its
+first deploy.
+
 Both apps use the domain `minstrel.alienstro.xyz`. Traefik sends `/api/*` to the API and all other
 paths to the web app, so the browser reaches the API on the same origin.
 
