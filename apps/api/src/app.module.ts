@@ -16,6 +16,7 @@ import { AssistController } from './assist/assist.controller.js';
 import { AssistService } from './assist/assist.service.js';
 import { ConnectionsModule } from './connections/connections.module.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
+import { GenerationsModule } from './generations/generations.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
 import { StorageModule } from './storage/storage.module.js';
 
@@ -43,6 +44,7 @@ class MailerModule {}
     ProvidersModule,
     StorageModule,
     ConnectionsModule,
+    GenerationsModule,
     // Each limited route sets its own limit with @Throttle (spec §7.4). The default is only a fallback.
     ThrottlerModule.forRootAsync({
       inject: [DB],
