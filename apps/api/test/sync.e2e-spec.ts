@@ -83,6 +83,17 @@ describe('SyncService (e2e)', () => {
     await t.app.close();
   });
 
+  // Review focus: a song that runs during the deploy keeps its sync after the flow column goes.
+  it('a job song created before the deploy keeps its sync', async () => {
+    getTask.mockResolvedValue({ state: 'complete', tracks: [take(1)] });
+    const id = await insertGeneration({ status: 'text_ready' });
+
+    await sync.sync(id, { ifDue: true });
+
+    expect((await generation(id)).status).toBe('complete');
+    expect(await trackRows(id)).toHaveLength(1);
+  });
+
   it('a complete task stores 2 tracks and sets complete', async () => {
     getTask.mockResolvedValue({ state: 'complete', tracks: [take(1), take(2)] });
     const id = await insertGeneration();

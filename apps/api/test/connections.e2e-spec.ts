@@ -74,7 +74,7 @@ describe('connections routes (e2e)', () => {
     const music = res.body
       .filter((p: { kind: string }) => p.kind === 'music')
       .map((p: { adapter: string }) => p.adapter);
-    expect(music).toEqual(['kie', 'suno_classic']);
+    expect(music).toEqual(['kie']);
     expect(
       res.body.find((p: { kind: string }) => p.kind === 'text').adapter,
     ).toBe('openai_compatible');

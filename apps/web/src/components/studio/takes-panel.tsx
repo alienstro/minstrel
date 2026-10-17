@@ -9,8 +9,7 @@ import { formatDuration } from '@/lib/format';
 type StageState = 'done' | 'current' | 'todo';
 
 // Spec §10.2 principle 3: the stages are a real sequence. Each status names how many stages are done.
-const JOB_STAGES = ['Writing words', 'First take ready', 'All takes ready'];
-const DIRECT_STAGES = ['Waiting for a free place', 'Making the song', 'Song ready'];
+const STAGES = ['Writing words', 'First take ready', 'All takes ready'];
 
 const DONE_COUNT: Record<GenerationStatus, number> = {
   submitting: 0,
@@ -95,13 +94,12 @@ function TakeList({ tracks }: { tracks: TrackDto[] }) {
 }
 
 function Stages({ generation }: { generation: GenerationDto }) {
-  const names = generation.flow === 'direct' ? DIRECT_STAGES : JOB_STAGES;
   const done = DONE_COUNT[generation.status];
   const stateOf = (i: number): StageState => (i < done ? 'done' : i === done ? 'current' : 'todo');
 
   return (
     <ol aria-label="Progress" aria-live="polite" className="m-0 mt-2 flex list-none flex-col gap-2.5 p-0">
-      {names.map((name, i) => {
+      {STAGES.map((name, i) => {
         const state = stateOf(i);
         return (
           <li key={name} data-state={state} className={`mono flex items-center gap-2.5 text-[11px] ${state === 'todo' ? 'mu' : ''}`}>

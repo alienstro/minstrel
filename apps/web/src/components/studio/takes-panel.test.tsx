@@ -15,7 +15,6 @@ const generation = (status: GenerationStatus, extra: Partial<GenerationDto> = {}
   id: 'g-1',
   connectionId: 'c-kie',
   adapter: 'kie',
-  flow: 'job',
   status,
   input: { idea: 'a sea shanty about a lost cat', instrumental: false, model: 'V6' },
   error: null,

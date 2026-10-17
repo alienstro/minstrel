@@ -47,7 +47,7 @@ export class SyncService {
     if (!row) return;
 
     // A callback can come before submit saves provider_task_id. Submit sets the row due after that.
-    if (row.flow !== 'job' || !JOB_DUE_STATES.includes(row.status) || !row.providerTaskId) {
+    if (!JOB_DUE_STATES.includes(row.status) || !row.providerTaskId) {
       await this.releaseLease(row.id);
       return;
     }
@@ -59,10 +59,6 @@ export class SyncService {
     }
     // A generation always has a music adapter. registry.music() throws for any other adapter.
     const provider = this.registry.music(row.adapter as MusicAdapter);
-    if (provider.flow !== 'job') {
-      await this.releaseLease(row.id);
-      return;
-    }
 
     // The provider call is outside any transaction, so a slow provider never holds a lock.
     let result: MusicTaskResult | null = null;

@@ -20,7 +20,6 @@ export function toGenerationDto(row: GenerationRow, trackRows: TrackRow[] = []):
     id: row.id,
     connectionId: row.connectionId,
     adapter: row.adapter as MusicAdapter,
-    flow: row.flow,
     status: row.status,
     input: row.input,
     error: row.errorCode

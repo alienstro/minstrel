@@ -30,7 +30,6 @@ const generation = (id: string, status: GenerationStatus, idea: string): Generat
   id,
   connectionId: 'c-kie',
   adapter: 'kie',
-  flow: 'job',
   status,
   input: { idea, instrumental: false, model: 'V6' },
   error: null,

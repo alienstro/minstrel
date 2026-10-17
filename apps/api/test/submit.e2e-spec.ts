@@ -53,7 +53,6 @@ describe('POST /api/generations, job flow (e2e)', () => {
     expect(res.body).toMatchObject({
       connectionId,
       adapter: 'kie',
-      flow: 'job',
       status: 'pending',
       input,
       error: null,
