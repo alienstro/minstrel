@@ -103,7 +103,7 @@ describe('SongForm', () => {
     const onCreated = vi.fn();
     renderForm(onCreated);
     await pickModel('V6');
-    await userEvent.type(screen.getByLabelText('Idea'), 'a sea shanty about a lost cat');
+    await userEvent.type(screen.getByLabelText('What is the song about?'), 'a sea shanty about a lost cat');
     const button = screen.getByRole('button', { name: /make song/i });
     await userEvent.dblClick(button);
     expect(button).toBeDisabled();
@@ -121,7 +121,7 @@ describe('SongForm', () => {
     const api = fakeApi({ 'POST /api/assist': { text: '[Verse]\nThe cat set sail' } });
     renderForm();
     await pickModel('V6');
-    await userEvent.type(screen.getByLabelText('Idea'), 'a sea shanty about a lost cat');
+    await userEvent.type(screen.getByLabelText('What is the song about?'), 'a sea shanty about a lost cat');
     await userEvent.click(screen.getByRole('button', { name: 'Write lyrics' }));
     await vi.waitFor(() => expect(screen.getByLabelText('Lyrics')).toHaveValue('[Verse]\nThe cat set sail'));
     expect(api.calls[0]!.body).toMatchObject({ connectionId: 'c-text', task: 'lyrics', idea: 'a sea shanty about a lost cat' });

@@ -4,7 +4,9 @@ import type { GenerationDto, ModelOption, Page } from '@minstrel/shared';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Logo } from '@/components/brand/logo';
 import { connectionsQuery, providersQuery } from '@/components/connections/connection-list';
+import { usePlayer } from '@/components/player/player-context';
 import { isFinished } from '@/hooks/use-generation';
 import { apiFetch } from '@/lib/api';
 import { SongForm } from './song-form';
@@ -43,42 +45,51 @@ export function StudioView() {
   });
   const recent = useQuery(recentGenerationsQuery);
   const [created, setCreated] = useState<GenerationDto[]>([]);
+  const { playing } = usePlayer();
 
   if (connections.isPending || providers.isPending || modelQueries.some((q) => q.isPending)) {
-    return <p className="text-muted">Loading…</p>;
+    return <p className="mono mu text-center text-[11px]">Loading…</p>;
   }
   if (connections.isError || providers.isError) {
     return <p role="alert">Minstrel could not load your keys. Reload the page.</p>;
   }
   if (music.length === 0) {
     return (
-      <div className="card max-w-xl">
-        <span className="card-pill">Start here</span>
-        <p>
-          Add a music provider key to make songs.{' '}
-          <Link href="/settings/connections" className="underline">
-            Add key
-          </Link>
-        </p>
+      <div className="card mx-auto max-w-xl flex-row flex-wrap items-center justify-between py-3 pr-3 pl-6">
+        <p className="m-0 text-[14px]">Add a music provider key to make songs.</p>
+        <Link href="/settings/connections" className="pill dark">
+          Add key <span aria-hidden="true">→</span>
+        </Link>
       </div>
     );
   }
 
   const models = Object.fromEntries(music.map((c, i) => [c.id, modelQueries[i]?.data ?? []]));
+  const takes = takesToShow(created, recent.data?.items ?? []);
+  const trackCount = takes.reduce((n, g) => n + g.tracks.length, 0);
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <section className="card">
-        <span className="card-pill">New song</span>
+    <div className="flex flex-wrap items-start gap-x-16 gap-y-14">
+      <div className="min-w-0 flex-[999_1_560px]">
         <SongForm
           connections={connections.data}
           providers={providers.data}
           models={models}
           onCreated={(g) => setCreated((list) => [g, ...list])}
         />
-      </section>
-      <section className="card" aria-label="Takes">
-        <span className="card-pill">Takes</span>
-        <TakesPanel generations={takesToShow(created, recent.data?.items ?? [])} />
+      </div>
+      <section aria-label="Takes" className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+        {/* The record spins while a song plays. */}
+        <div className="relative h-[216px] w-[300px] self-center" aria-hidden="true">
+          <span className="disc absolute top-2 left-[92px] size-[200px]" data-paused={!playing} />
+          <span className="absolute top-0 left-0 z-[1] flex size-[216px] items-center justify-center rounded-2xl bg-ink outline outline-black/25">
+            <Logo size={110} tone="white" />
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between">
+          <h2 className="m-0 text-[11px] font-semibold uppercase">Takes</h2>
+          <span className="mono mu text-[11px]">{trackCount === 1 ? '1 take' : `${trackCount} takes`}</span>
+        </div>
+        <TakesPanel generations={takes} />
       </section>
     </div>
   );

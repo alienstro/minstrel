@@ -11,7 +11,7 @@ const TABS = [
 export function SettingsTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Settings" className="flex gap-2">
+    <nav aria-label="Settings" className="flex justify-end gap-1.5">
       {TABS.map((tab) => {
         const current = pathname === tab.href;
         return (
@@ -19,11 +19,7 @@ export function SettingsTabs() {
             key={tab.href}
             href={tab.href}
             aria-current={current ? 'page' : undefined}
-            className={
-              current
-                ? 'rounded-[13px] bg-soft px-3 py-1 text-ink'
-                : 'rounded-[13px] px-3 py-1 text-muted hover:bg-panel'
-            }
+            className={`pill min-h-[34px] px-3.5 text-[11px] uppercase ${current ? 'dark' : 'gl'}`}
           >
             {tab.label}
           </Link>
