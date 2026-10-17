@@ -61,4 +61,31 @@ describe('logger', () => {
     expect(output).toContain('POST');
     expect(output).not.toMatch(/sk-secret|xi-secret|sk-other|c=1/);
   });
+
+  it('a logged request URL keeps no query string and no reset token', () => {
+    const lines: string[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, done) {
+        lines.push(String(chunk));
+        done();
+      },
+    });
+    const logger = pino(loggerOptions(), stream);
+    logger.info({
+      req: {
+        method: 'POST',
+        url: '/api/webhooks/kie/0199?t=cb-secret',
+        query: { t: 'cb-secret' },
+      },
+    });
+    logger.info({
+      req: {
+        method: 'GET',
+        url: '/api/auth/reset-password/reset-secret?callbackURL=%2F',
+      },
+    });
+    const output = lines.join('');
+    expect(output).toContain('/api/webhooks/kie/0199');
+    expect(output).not.toMatch(/cb-secret|reset-secret/);
+  });
 });

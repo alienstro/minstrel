@@ -21,7 +21,19 @@ export function loggerOptions(): LoggerOptions {
   return {
     level: process.env.LOG_LEVEL ?? 'info',
     redact: { paths: PINO_REDACT_PATHS, censor: '[Redacted]' },
+    serializers: { req: safeRequest },
   };
+}
+
+// The query string carries the callback token (?t=) and the email tokens, and the reset path carries
+// a token too. The log keeps only the path, with the reset token hidden.
+function safeRequest(req: Record<string, unknown>): Record<string, unknown> {
+  const { query: _query, ...rest } = req;
+  if (typeof rest.url !== 'string') return rest;
+  const path = rest.url
+    .split('?')[0]!
+    .replace(/(\/reset-password\/)[^/]+/, '$1[Redacted]');
+  return { ...rest, url: path };
 }
 
 const SECRET_NAME = /authorization|cookie|key|secret|token|password/i;
