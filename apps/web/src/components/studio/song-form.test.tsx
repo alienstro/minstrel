@@ -173,4 +173,34 @@ describe('SongForm', () => {
       idea: 'a sea shanty about a lost cat',
     });
   });
+
+  describe('without a text key', () => {
+    const musicOnly = connections.filter((c) => c.kind === 'music');
+    const renderMusicOnly = () =>
+      renderWithQuery(<SongForm connections={musicOnly} providers={providers} models={models} onCreated={vi.fn()} />);
+
+    it('without a text key, Write lyrics uses the kie connection', async () => {
+      const api = fakeApi({ 'POST /api/assist': { text: '[Verse]\nkie.ai lyrics' } });
+      renderMusicOnly();
+      await pickModel('V6');
+      await userEvent.type(screen.getByLabelText('What is the song about?'), 'a sea shanty about a lost cat');
+      await userEvent.click(screen.getByRole('button', { name: 'Write lyrics' }));
+      await vi.waitFor(() => expect(screen.getByLabelText('Lyrics')).toHaveValue('[Verse]\nkie.ai lyrics'));
+      expect(api.calls[0]!.body).toEqual({
+        connectionId: 'c-kie',
+        task: 'lyrics',
+        idea: 'a sea shanty about a lost cat',
+        fields: { lyrics: '', style: '', title: '' },
+      });
+      expect(screen.queryByRole('button', { name: /^helper model/i })).toBeNull();
+    });
+
+    it('without a text key, Suggest is disabled', async () => {
+      renderMusicOnly();
+      await pickModel('V6');
+      expect(screen.getByRole('button', { name: 'Suggest a style' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Suggest a title' })).toBeDisabled();
+      expect(screen.getByText('Write lyrics uses kie.ai. Add a text key in Settings to use Suggest.')).toBeInTheDocument();
+    });
+  });
 });

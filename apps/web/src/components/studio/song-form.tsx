@@ -101,14 +101,16 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   }
 
   async function help(task: Task, fill: (text: string) => void) {
-    if (!textConnection) return;
+    // Without a text key, Write lyrics uses the music connection of the chosen model (kie.ai).
+    const target = textConnection ?? (task === 'lyrics' ? connection : undefined);
+    if (!target) return;
     if (!idea.trim()) return setErrors({ idea: 'Describe the song first.' });
-    if (!helperModel) return setErrors({ helperModel: 'Choose a helper model.' });
+    if (textConnection && !helperModel) return setErrors({ helperModel: 'Choose a helper model.' });
     setErrors({});
     try {
       const result = await assist.mutateAsync({
-        connectionId: textConnection.id,
-        model: helperModel.modelId,
+        connectionId: target.id,
+        ...(textConnection && helperModel ? { model: helperModel.modelId } : {}),
         task,
         idea,
         fields: { lyrics, style, title },
@@ -120,6 +122,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   }
 
   const helperDisabled = !textConnection || assist.isPending;
+  const writeLyricsDisabled = (!textConnection && !connection) || assist.isPending;
   const showLyrics = caps?.lyrics ?? true;
   const showStyle = caps?.style ?? true;
 
@@ -233,7 +236,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
           label="Lyrics"
           error={errors.lyrics}
           action={
-            <button type="button" className="txt" disabled={helperDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
+            <button type="button" className="txt" disabled={writeLyricsDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
               Write lyrics
             </button>
           }
@@ -292,7 +295,13 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         </Field>
       </div>
 
-      {!textConnection ? <p className="hint">Add a text provider key in Settings to use Write lyrics and Suggest.</p> : null}
+      {!textConnection ? (
+        <p className="hint">
+          {connection
+            ? `Write lyrics uses ${providerName}. Add a text key in Settings to use Suggest.`
+            : 'Add a text provider key in Settings to use Write lyrics and Suggest.'}
+        </p>
+      ) : null}
 
       {errors.form ? (
         <div role="alert" className="pl-5">
