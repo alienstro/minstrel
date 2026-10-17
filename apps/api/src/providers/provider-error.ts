@@ -54,3 +54,32 @@ export function cleanReason(reason: string): string {
   if (!text) return 'no reason given';
   return text.length > MAX_REASON ? `${text.slice(0, MAX_REASON)}…` : text;
 }
+
+// Reads the reason from a provider error body: `error.message`, `message`, or `msg`, else the text.
+export async function readReason(response: {
+  text(): Promise<string>;
+}): Promise<string> {
+  const text = await response.text().catch(() => '');
+  try {
+    const body = JSON.parse(text) as {
+      error?: { message?: unknown } | string;
+      message?: unknown;
+      msg?: unknown;
+    };
+    const reason =
+      (typeof body.error === 'object' ? body.error?.message : body.error) ??
+      body.message ??
+      body.msg;
+    if (typeof reason === 'string') return reason;
+  } catch {
+    // The body is not JSON. Use the text.
+  }
+  return text.slice(0, 500);
+}
+
+export async function errorFromResponse(
+  response: { status: number; text(): Promise<string> },
+  label: string,
+): Promise<ApiError> {
+  return mapProviderError(response.status, await readReason(response), label);
+}
