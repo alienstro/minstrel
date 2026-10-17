@@ -55,7 +55,8 @@ export function cleanReason(reason: string): string {
   return text.length > MAX_REASON ? `${text.slice(0, MAX_REASON)}…` : text;
 }
 
-// Reads the reason from a provider error body: `error.message`, `message`, or `msg`, else the text.
+// Reads the reason from a provider error body: `error.message`, `message`, `msg`, or the ElevenLabs
+// `detail` (an object with `message`, or a list of `{ msg }`), else the text.
 export async function readReason(response: {
   text(): Promise<string>;
 }): Promise<string> {
@@ -65,11 +66,18 @@ export async function readReason(response: {
       error?: { message?: unknown } | string;
       message?: unknown;
       msg?: unknown;
+      detail?: { message?: unknown } | Array<{ msg?: unknown }> | string;
     };
+    const detail = Array.isArray(body.detail)
+      ? body.detail[0]?.msg
+      : typeof body.detail === 'object'
+        ? body.detail?.message
+        : body.detail;
     const reason =
       (typeof body.error === 'object' ? body.error?.message : body.error) ??
       body.message ??
-      body.msg;
+      body.msg ??
+      detail;
     if (typeof reason === 'string') return reason;
   } catch {
     // The body is not JSON. Use the text.
