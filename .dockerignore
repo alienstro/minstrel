@@ -1,0 +1,16 @@
+# The Docker build context. The images build from the source and install their own packages.
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/.env*
+!**/.env.example
+**/.vercel
+.git
+.superpowers
+.archify
+docs
+apps/web/e2e
+apps/web/test-results
+apps/web/playwright-report
