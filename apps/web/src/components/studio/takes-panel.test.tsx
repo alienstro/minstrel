@@ -1,7 +1,15 @@
 import type { GenerationDto, GenerationStatus, TrackDto } from '@minstrel/shared';
 import { act, screen, within } from '@testing-library/react';
+import { PlayerProvider } from '@/components/player/player-context';
 import { fakeApi, renderWithQuery } from '@/test/render';
 import { TakesPanel } from './takes-panel';
+
+const renderPanel = (generations: GenerationDto[]) =>
+  renderWithQuery(
+    <PlayerProvider>
+      <TakesPanel generations={generations} />
+    </PlayerProvider>,
+  );
 
 const generation = (status: GenerationStatus, extra: Partial<GenerationDto> = {}): GenerationDto => ({
   id: 'g-1',
@@ -49,7 +57,7 @@ describe('TakesPanel', () => {
     const { calls } = fakeApi({
       'GET /api/generations/g-1': replies(generation('first_ready'), generation('complete')),
     });
-    renderWithQuery(<TakesPanel generations={[generation('pending')]} />);
+    renderPanel([generation('pending')]);
 
     await nextPoll();
     await nextPoll();
@@ -63,7 +71,7 @@ describe('TakesPanel', () => {
 
   it('finished stages show a check mark and the current one a spinner', async () => {
     fakeApi({ 'GET /api/generations/g-1': generation('text_ready') });
-    renderWithQuery(<TakesPanel generations={[generation('text_ready')]} />);
+    renderPanel([generation('text_ready')]);
 
     const stages = within(screen.getByRole('list', { name: 'Progress' })).getAllByRole('listitem');
     expect(stages.map((li) => li.dataset.state)).toEqual(['done', 'current', 'todo']);
@@ -77,9 +85,7 @@ describe('TakesPanel', () => {
   it('a failed generation shows the API message', async () => {
     fakeApi({});
     const message = 'kie.ai could not make this song: the model is busy.';
-    renderWithQuery(
-      <TakesPanel generations={[generation('failed', { error: { code: 'generation_failed', message } })]} />,
-    );
+    renderPanel([generation('failed', { error: { code: 'generation_failed', message } })]);
 
     expect(screen.getByRole('alert')).toHaveTextContent(message);
     expect(screen.queryByRole('list', { name: 'Progress' })).not.toBeInTheDocument();
@@ -89,7 +95,7 @@ describe('TakesPanel', () => {
     fakeApi({
       'GET /api/generations/g-1': generation('complete', { tracks: [track('t-1', 161), track('t-2', 182)] }),
     });
-    renderWithQuery(<TakesPanel generations={[generation('pending')]} />);
+    renderPanel([generation('pending')]);
     expect(screen.queryByText('The Cat Who Sailed')).not.toBeInTheDocument();
 
     await nextPoll();
@@ -98,5 +104,6 @@ describe('TakesPanel', () => {
     expect(takes).toHaveLength(2);
     expect(takes[0]).toHaveTextContent(/The Cat Who Sailed.*2:41/);
     expect(takes[1]).toHaveTextContent(/The Cat Who Sailed.*3:02/);
+    expect(within(takes[0]!).getByRole('button', { name: 'Play take 1' })).toBeInTheDocument();
   });
 });

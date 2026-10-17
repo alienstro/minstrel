@@ -1,7 +1,9 @@
 'use client';
 
 import type { GenerationDto, GenerationStatus, TrackDto } from '@minstrel/shared';
+import { usePlayer } from '@/components/player/player-context';
 import { useGeneration } from '@/hooks/use-generation';
+import { formatDuration } from '@/lib/format';
 
 type StageState = 'done' | 'current' | 'todo';
 
@@ -19,12 +21,6 @@ const DONE_COUNT: Record<GenerationStatus, number> = {
   complete: 3,
   failed: 0,
 };
-
-export function formatDuration(seconds: number | null): string {
-  if (seconds === null) return '';
-  const whole = Math.round(seconds);
-  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
-}
 
 export function TakesPanel({ generations }: { generations: GenerationDto[] }) {
   if (generations.length === 0) return <p className="text-muted">Your takes appear here.</p>;
@@ -56,14 +52,28 @@ function TakeGroup({ initial }: { initial: GenerationDto }) {
 }
 
 function TakeList({ tracks }: { tracks: TrackDto[] }) {
+  const player = usePlayer();
   return (
     <ul aria-label="Takes of this song" className="flex flex-col gap-1">
-      {tracks.map((t) => (
-        <li key={t.id} className="take-enter flex items-baseline justify-between gap-4">
-          <span className="font-extrabold">{t.title}</span>
-          <span className="text-muted tabular-nums">{formatDuration(t.durationSeconds)}</span>
-        </li>
-      ))}
+      {tracks.map((t, i) => {
+        const isPlaying = player.current?.id === t.id && player.playing;
+        return (
+          <li key={t.id} className="take-enter flex items-center justify-between gap-4">
+            <span className="font-extrabold">{t.title}</span>
+            <span className="flex items-center gap-3">
+              <span className="text-muted tabular-nums">{formatDuration(t.durationSeconds)}</span>
+              <button
+                type="button"
+                className="btn btn-text"
+                aria-label={`${isPlaying ? 'Pause' : 'Play'} take ${i + 1}`}
+                onClick={() => (isPlaying ? player.pause() : player.play(t))}
+              >
+                <span aria-hidden="true">{isPlaying ? '❚❚' : '▶'}</span>
+              </button>
+            </span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
