@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { AuthStage } from '@/components/brand/auth-stage';
 import { FieldError } from '@/components/ui/text-field';
 import { authClient } from '@/lib/auth-client';
@@ -18,6 +18,20 @@ function messageFor(code: string | null): string | undefined {
     return 'Minstrel cannot link this Google account. Use the Google account with the email of your Minstrel account.';
   }
   return 'Google sign-in did not finish. Try again.';
+}
+
+function ErrorLine({ message }: { message: string }) {
+  return (
+    <div role="alert">
+      <FieldError id="auth-form-error">{message}</FieldError>
+    </div>
+  );
+}
+
+// Only this line reads the URL, so the Suspense boundary around it lets the rest of the page prerender.
+function UrlError() {
+  const message = messageFor(useSearchParams().get('error'));
+  return message ? <ErrorLine message={message} /> : null;
 }
 
 // Google's standard "G" mark. Its four colors must stay as they are (Google sign-in branding rules).
@@ -47,10 +61,8 @@ function GoogleMark() {
 // Spec §7.2: Google is the only sign-in. One button signs in a user, or makes the account of a new user.
 // `bare` drops the stage, for a form inside another page such as Home.
 export function AuthForm({ bare = false }: { bare?: boolean }) {
-  const urlError = messageFor(useSearchParams().get('error'));
   const [startError, setStartError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const error = startError ?? urlError;
 
   async function onGoogle() {
     setBusy(true);
@@ -75,11 +87,13 @@ export function AuthForm({ bare = false }: { bare?: boolean }) {
         </span>
         Continue with Google
       </button>
-      {error ? (
-        <div role="alert">
-          <FieldError id="auth-form-error">{error}</FieldError>
-        </div>
-      ) : null}
+      {startError ? (
+        <ErrorLine message={startError} />
+      ) : (
+        <Suspense>
+          <UrlError />
+        </Suspense>
+      )}
       <p className="mono mu auth-note">
         New to Minstrel? The same button makes your account. When you continue, you agree to the{' '}
         <Link href="/terms" className="dotted">
