@@ -18,18 +18,19 @@
   transform: translateX(-50%);
 }
 
+/* The case is as wide as the cover, so the page centers the cover. The disc sticks out to the right. */
 .home-case {
   position: relative;
-  width: 420px;
-  height: 300px;
+  width: 400px;
+  height: 400px;
 }
 
 .home-disc {
   position: absolute;
-  top: 10px;
-  left: 132px;
-  width: 280px;
-  height: 280px;
+  top: 14px;
+  left: 176px;
+  width: 372px;
+  height: 372px;
   border-radius: 50%;
   background:
     radial-gradient(circle, #ffffff 0 9%, #bdbdbd 9.5% 10.5%, #f2f2f2 11% 17%, transparent 17.5%),
@@ -42,8 +43,8 @@
   position: absolute;
   inset: 0 auto auto 0;
   z-index: 1;
-  width: 300px;
-  height: 300px;
+  width: 400px;
+  height: 400px;
   overflow: hidden;
   border-radius: 16px;
   outline: 0.5px solid rgb(0 0 0 / 24%);
@@ -231,8 +232,8 @@
   }
 
   .home-case {
-    margin: -30px 0;
-    scale: 0.7;
+    margin: -80px 0;
+    scale: 0.55;
   }
 
   .home-dock {

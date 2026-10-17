@@ -11,8 +11,9 @@ Do these steps in order before the first public launch. The section numbers refe
    Minstrel takes payments or shows ads.
 3. Keep Fluid compute on. Do not set `maxDuration`. On Hobby, the default and the maximum are 300 s.
 4. Put the functions in the same region as the database, for example `iad1`.
-5. The `api` service runs `vercel-build`: `drizzle-kit migrate && nest build`. The migration uses
-   `DATABASE_URL_UNPOOLED`.
+5. The `api` service runs `build`. After the build, `scripts/migrate-on-vercel.mjs` runs
+   `drizzle-kit migrate` with `DATABASE_URL_UNPOOLED`. Each Preview and Production deploy runs it.
+   Preview and Production share one database, so a Preview deploy also changes the production schema.
 
 ## 2. Neon database
 
