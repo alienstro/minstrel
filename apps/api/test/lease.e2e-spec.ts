@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 import { DB, type Db } from '../src/db/db.module.js';
 import { generations } from '../src/db/schema.js';
 import { GenerationsRepo } from '../src/generations/generations.repo.js';
@@ -7,6 +7,8 @@ import { createTestApp, type TestApp } from './support/test-app.js';
 import { resetTestDb } from './support/test-db.js';
 
 type NewGeneration = typeof generations.$inferInsert;
+// A test row can set a time column with SQL, so that Postgres now() decides the time.
+type GenerationValues = { [K in keyof NewGeneration]?: NewGeneration[K] | SQL };
 
 describe('GenerationsRepo lease (e2e)', () => {
   let t: TestApp;
@@ -14,7 +16,7 @@ describe('GenerationsRepo lease (e2e)', () => {
   let repo: GenerationsRepo;
   let userId: string;
 
-  async function insertGeneration(values: Partial<NewGeneration> = {}): Promise<string> {
+  async function insertGeneration(values: GenerationValues = {}): Promise<string> {
     const [row] = await db
       .insert(generations)
       .values({
@@ -22,7 +24,7 @@ describe('GenerationsRepo lease (e2e)', () => {
         adapter: 'kie',
         flow: 'job',
         status: 'pending',
-        input: { idea: 'a song' },
+        input: { idea: 'a song', instrumental: false, model: 'V5' },
         ...values,
       })
       .returning({ id: generations.id });
@@ -60,17 +62,17 @@ describe('GenerationsRepo lease (e2e)', () => {
   });
 
   it('an expired lease can be claimed again', async () => {
-    const live = await insertGeneration({ leaseUntil: sql`now() + interval '1 minute'` as never });
-    const expired = await insertGeneration({ leaseUntil: sql`now() - interval '1 second'` as never });
+    const live = await insertGeneration({ leaseUntil: sql`now() + interval '1 minute'` });
+    const expired = await insertGeneration({ leaseUntil: sql`now() - interval '1 second'` });
 
     expect(await repo.claimLease(live, 90)).toBeNull();
     expect((await repo.claimLease(expired, 90))?.id).toBe(expired);
   });
 
   it('due uses Postgres now(), not the app clock', async () => {
-    const due = await insertGeneration({ nextPollAt: sql`now() - interval '1 second'` as never });
-    await insertGeneration({ nextPollAt: sql`now() + interval '1 minute'` as never });
-    await insertGeneration({ status: 'complete', nextPollAt: sql`now() - interval '1 second'` as never });
+    const due = await insertGeneration({ nextPollAt: sql`now() - interval '1 second'` });
+    await insertGeneration({ nextPollAt: sql`now() + interval '1 minute'` });
+    await insertGeneration({ status: 'complete', nextPollAt: sql`now() - interval '1 second'` });
     // An app clock one day ahead would make the second row due too.
     vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 86_400_000 });
 
@@ -81,10 +83,10 @@ describe('GenerationsRepo lease (e2e)', () => {
 
   it('due keeps to one user when a userId is given', async () => {
     const otherUser = await insertUser(db, 'grace@example.com');
-    const mine = await insertGeneration({ nextPollAt: sql`now() - interval '1 second'` as never });
+    const mine = await insertGeneration({ nextPollAt: sql`now() - interval '1 second'` });
     await insertGeneration({
       userId: otherUser,
-      nextPollAt: sql`now() - interval '1 second'` as never,
+      nextPollAt: sql`now() - interval '1 second'`,
     });
 
     const rows = await repo.dueJobGenerations(5, userId);
@@ -97,13 +99,13 @@ describe('GenerationsRepo lease (e2e)', () => {
       adapter: 'elevenlabs',
       flow: 'direct',
       status: 'running',
-      leaseUntil: sql`now() - interval '1 second'` as never,
+      leaseUntil: sql`now() - interval '1 second'`,
     });
     await insertGeneration({
       adapter: 'elevenlabs',
       flow: 'direct',
       status: 'running',
-      leaseUntil: sql`now() + interval '5 minutes'` as never,
+      leaseUntil: sql`now() + interval '5 minutes'`,
     });
     await insertGeneration({ adapter: 'elevenlabs', flow: 'direct', status: 'queued' });
 
