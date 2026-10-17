@@ -7,8 +7,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "nest build && node scripts/bundle-for-vercel.mjs",
-    "vercel-build": "drizzle-kit migrate && nest build",
+    "build": "nest build && node scripts/bundle-for-vercel.mjs && node scripts/migrate-on-vercel.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
