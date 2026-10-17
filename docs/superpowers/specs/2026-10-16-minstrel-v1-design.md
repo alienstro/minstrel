@@ -538,56 +538,73 @@ each with a link to the page where the user gets a key. This empty state replace
 The player bar is fixed at the bottom of every signed-in page. One `<audio>` element lives in a React
 context, so playback continues across page changes. The Media Session API gives lock-screen controls.
 
-### 10.2 Design direction: the dye house
+### 10.2 Design direction: the chrome disc
 
-Medieval minstrels wore cloth dyed with three plants: **woad** (blue), **madder** (red), and **weld**
-(yellow). Minstrel takes its palette from those dyes on undyed cool linen, and its ink from oak gall. The
-look avoids parchment, gold leaf, and wood textures, which are the usual "medieval" defaults.
+Minstrel follows desktop.fm (measured from its live CSS on 2026-10-17). The interface is gray and nearly
+black and white. One object carries the brand: a white CD that floats in a field of green laser lines.
+The lasers are part of the scene, not a UI color.
 
 **Color tokens**
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--bg` | `#E4E8EE` linen | `#17213A` deep woad | Page background |
-| `--ink` | `#2A2420` oak gall | `#E4E8EE` linen | Text |
-| `--structure` | `#24406F` woad | `#7FA3D9` light woad | The selected navigation item, links, focus outline |
-| `--action` | `#9C2A3C` madder | `#E0727F` light madder | One primary action on each screen, for example "Make song" |
-| `--on-action` | `#FFFFFF` | `#17213A` | Text on the primary action |
-| `--weld` | `#D8B22E` | `#D8B22E` | Playback only: the progress bar and the "now playing" mark |
-| `--player` | `#24406F` woad | `#24406F` woad | Player bar background, in both modes |
-| `--edge` | `#6E7F9C` | `#6A7B9B` | Input and button borders |
-| `--wash` | `#C9D3E3` | `#22304F` | Dividers and hover backgrounds (decoration only) |
+| `--bg` | `#BEC2C4` scene gray | `#1B1C1D` | Page background |
+| `--panel` | `#DDDDDD` pale stone | `#2D2D2D` | Cards and the player |
+| `--ink` | `#111111` carbon | `#EEEEEE` | Text and the focus outline |
+| `--muted` | `#4A4A4A` | `#A8A8A8` | Labels and hints |
+| `--action` | `#2D2D2D` graphite | `#EEEEEE` | One primary action on each screen, the title pills, the selected nav item |
+| `--soft` | `#B5ADAD` taupe | `#4A4646` | Second actions and play buttons |
+| `--field` | white at 70% on the card | black at 25% | Inputs |
+| `--laser` | `#3DFF8A` | `#3DFF8A` | The scene only (landing and sign-in pages). Never on a control. |
+| `--selection` | `#0059FF` | `#0059FF` | Text selection only |
+
+Errors use no color. An icon, bold text, and a 2 px ink edge show the error. WCAG 1.4.1 permits this,
+because the meaning does not depend on color.
 
 Measured WCAG contrast ratios:
 
 | Pair | Ratio | Needed |
 |---|---|---|
-| Ink on light bg | 12.45 | 4.5 (text) |
-| Ink on dark bg | 12.98 | 4.5 (text) |
-| Woad on light bg | 8.38 | 4.5 (link text) |
-| Light woad on dark bg | 6.19 | 4.5 (link text) |
-| White on madder | 7.47 | 4.5 (button text) |
-| Deep woad on light madder | 5.23 | 4.5 (button text) |
-| Madder on light bg | 6.08 | 3.0 (button edge) |
-| Light madder on dark bg | 5.23 | 3.0 (button edge) |
-| Linen on player bar | 8.38 | 4.5 (text) |
-| Weld on player bar | 5.07 | 3.0 (progress bar) |
-| Edge on light bg | 3.30 | 3.0 (control edge) |
-| Edge on dark bg | 3.74 | 3.0 (control edge) |
+| Ink on light bg | 10.52 | 4.5 (text) |
+| Ink on card | 13.90 | 4.5 (text) |
+| Muted on card | 6.52 | 4.5 (text) |
+| Muted on light bg | 4.94 | 4.5 (text) |
+| White on graphite button | 13.77 | 4.5 (button text) |
+| Ink on taupe button | 8.58 | 4.5 (button text) |
+| Placeholder `#6F6F6F` on field | 4.61 | 4.5 (text) |
+| Ink focus outline on card | 13.90 | 3.0 (focus) |
+| Ink on dark bg | 14.71 | 4.5 (text) |
+| Muted on dark card | 5.79 | 4.5 (text) |
 
-**Rule:** weld appears only on the player bar or on the dark background. On the light background, weld
-has a ratio of 1.65, so the "now playing" row in the light library uses a woad mark. `--wash` is too light
-for a control edge (1.23 on linen), so it is decoration only.
+**Rule:** two desktop.fm values fail WCAG, so Minstrel changes them. The label gray `#6F6F6F` is 3.70
+on the card, so labels use `#4A4A4A`. The white focus outline is 1.36 on the card, so focus uses ink.
 
 **Type**
 
-| Role | Face | Notes |
-|---|---|---|
-| Song titles and page titles | Grenze Gotisch (Google Fonts) | A readable blackletter. Use it only at 24 px or more, never for body text or buttons. |
-| Everything else | Alegreya Sans (Google Fonts) | A humanist sans with calligraphic roots. Use tabular figures for durations. |
+One face: the system font stack (`-apple-system, system-ui, BlinkMacSystemFont, 'Segoe UI', Roboto`).
+No web font loads.
 
-Type scale: 16 px base, ratio 1.25 (16, 20, 25, 31, 39). Body line height 1.5. Lyrics use a 65-character
-measure and line height 1.6. Labels are sentence case, never all caps.
+| Role | Size | Weight | Tracking |
+|---|---|---|---|
+| Page titles, wordmark | 28 px | 800 | -1 px |
+| Section titles | 18 px | 800 | -0.5 px |
+| Body, inputs, buttons | 16 px | 700 | -0.25 px |
+| Labels, pills, meta | 12 px | 800 | -0.5 px |
+| Tag | 10 px | 700 | 0 |
+
+No weight is below 500. Line height is 1.25. Lyrics use line height 1.5. Labels are sentence case,
+never all caps. Use tabular figures for durations.
+
+**Shape**
+
+| Element | Radius |
+|---|---|
+| Cards | 25 px, shadow `0 0 40px rgba(51,51,51,.1)`, no border |
+| Buttons and inputs | 20 px, 55 px tall for the main block buttons |
+| Title pill and switch | 13 px, 26 px tall |
+
+Each card has its title in a dark pill that floats 10 px above it. A primary button puts its label on
+the left and a chevron on the right. A pressed button scales to 98%.
 
 **Layout**
 
@@ -607,8 +624,7 @@ Studio, wide screen. The form is left-aligned. Text never centers, except in the
 │ └────────────────────────────────────┘ │                            │
 │ Style [ shanty, accordion ] [Suggest]  │                            │
 │ Title [                   ] [Suggest]  │                            │
-│ Provider [kie.ai ▾] Model [V6 ▾]       │
-│ Instrumental [ ]                       │                            │
+│ Instrumental [ ] Model [V6 · kie.ai ▾] │                            │
 │                          [ Make song ] │                            │
 ├───────────────────────────────────────┴────────────────────────────┤
 │ ▶  The Cat Who Sailed    ━━━━━━━━━━━━━━━━──────────  1:12 / 2:41   │
@@ -616,8 +632,22 @@ Studio, wide screen. The form is left-aligned. Text never centers, except in the
 ```
 
 The form shows only the fields in the adapter's `capabilities`. For example, ElevenLabs shows a length
-control and keeps the title in Minstrel only. When the user changes the provider, the values in hidden fields
-stay in the form, so nothing typed is lost.
+control and keeps the title in Minstrel only. When the user picks a model of a different provider, the values
+in hidden fields stay in the form, so nothing typed is lost.
+
+The **Model** field is a searchable model picker. It follows the ARIA 1.2 combobox pattern, because a
+provider such as OpenRouter can list hundreds of models, and a plain `<select>` has no search.
+
+- The field shows the model and its connection, for example "V6 · kie.ai". A pick sets the model and the
+  connection together, so the form has no separate Provider field.
+- A click opens a panel. The cursor is in the "Search models" field, and typing filters by model name,
+  connection label, or note.
+- The **Recent** group shows the last 3 models that the user picked. Below it, the models are grouped by
+  connection, from `GET /api/connections/:id/models`.
+- The arrow keys move the highlight, Enter picks, and Escape or a click outside closes the panel. The focus
+  stays in the search field, and `aria-activedescendant` names the highlighted model.
+- A search with no match shows "No models match". The panel footer shows the model count and an "Add a key"
+  link to Settings → Connections.
 
 On a phone, the "Takes" column moves below the form, and the player bar stays at the bottom.
 
@@ -628,23 +658,25 @@ The Cat Who Sailed           shanty, accordion        2:41    16 Oct
 Lantern Over Dunmoor         folk, harp, female       3:15    15 Oct
 ```
 
-The title (Grenze Gotisch) is the strongest element on each row. The other columns are quiet.
+The title (16 px, weight 800) is the strongest element on each row. The other columns are quiet. The list
+sits on one card.
 
 **Principles**
 
-1. Spend boldness in one place: blackletter song titles. Everything else is calm and plain.
-2. Each color has one job. Woad is structure, madder is the one action, and weld is "playing now".
+1. Spend boldness in one place: the disc and its lasers. Everything else is gray and calm.
+2. Each screen has one graphite primary button. Second actions are taupe or text.
 3. The three generation stages are a real sequence, so the UI lists them in order with a check mark
-   for each finished stage.
-4. Motion: one moment only. When a take is ready, its row grows into the "Takes" list. Respect
+   for each finished stage and a spinner for the current stage.
+4. Motion: a new take grows into the "Takes" list, and a pressed button scales down. Respect
    `prefers-reduced-motion`.
 5. Copy names user actions in plain words: "Make song", "Write lyrics", "Suggest", "Add key", "Test key".
    The success toast uses the same verb: "Key added".
 
-**Review against generic defaults.** The first plan had a parchment background with a serif display and
-a gold accent. That plan matched the cream-and-serif default, so it changed to cool linen with dye
-colors. A dark-only theme with one bright accent was also rejected, because it is the other common
-default. A card grid for the library was rejected, because songs are a list that people scan.
+**Disc asset.** The design files draw the disc with CSS as a stand-in. The final product needs a real
+3D render (for example, from Blender or Spline), exported as a WebP or AVIF image with a PNG fallback.
+
+**Earlier direction.** The first design used "the dye house": linen, woad, madder, weld, and a
+blackletter face. The owner rejected it on 2026-10-17 because the screens looked dated.
 
 ### 10.3 Quality floor
 
