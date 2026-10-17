@@ -186,6 +186,18 @@
   }
 }
 
+/* Spec §10.2 principle 4: a new take grows into the Takes list. */
+@keyframes take-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.take-enter {
+  animation: take-enter 220ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

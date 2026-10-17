@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { connectionsQuery, providersQuery } from '@/components/connections/connection-list';
 import { apiFetch } from '@/lib/api';
 import { SongForm } from './song-form';
+import { TakesPanel } from './takes-panel';
 
 export function StudioView() {
   const connections = useQuery(connectionsQuery);
@@ -55,7 +56,7 @@ export function StudioView() {
       </section>
       <section className="card" aria-label="Takes">
         <span className="card-pill">Takes</span>
-        {generations.length === 0 ? <p className="text-muted">Your takes appear here.</p> : null}
+        <TakesPanel generations={generations} />
       </section>
     </div>
   );
