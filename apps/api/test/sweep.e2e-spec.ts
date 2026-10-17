@@ -102,7 +102,8 @@ describe('daily sweep (e2e)', () => {
     expect(res.status).toBe(200);
     expect(sync).toHaveBeenCalledTimes(7);
     expect(sync.mock.calls.map(([id]) => id).sort()).toEqual([...due].sort());
-    expect(sync.mock.calls.every(([, opts]) => opts?.ifDue === true)).toBe(true);
+    // Step 2 copies the tracks in batches, so a sweep sync starts no copy of its own.
+    expect(sync.mock.calls.every(([, opts]) => opts?.ifDue === true && opts.startCopies === false)).toBe(true);
     expect(most).toBe(5);
   });
 

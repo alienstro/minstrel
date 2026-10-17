@@ -110,6 +110,17 @@ describe('SyncService (e2e)', () => {
     expect(t.background.queue).toHaveLength(2);
   });
 
+  it('a sync with startCopies false leaves the copies to the caller', async () => {
+    getTask.mockResolvedValue({ state: 'complete', tracks: [take(1), take(2)] });
+    const id = await insertGeneration();
+
+    await sync.sync(id, { startCopies: false });
+
+    expect(await generation(id)).toMatchObject({ status: 'complete' });
+    expect((await trackRows(id)).map((r) => r.storageStatus)).toEqual(['pending', 'pending']);
+    expect(t.background.queue).toHaveLength(0);
+  });
+
   it('the same track twice stays one row', async () => {
     getTask
       .mockResolvedValueOnce({ state: 'first_ready', tracks: [take(1), take(1)] })

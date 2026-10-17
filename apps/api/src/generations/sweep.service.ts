@@ -49,12 +49,12 @@ export class SweepService {
     const due = await this.repo.dueJobGenerations(LIST_LIMIT);
     result.synced = await this.inBatches(
       due.map((g) => g.id),
-      (id) => this.syncService.sync(id, { ifDue: true }),
+      (id) => this.syncService.sync(id, { ifDue: true, startCopies: false }),
       inTime,
     );
     if (result.synced < due.length) return { ...result, stopped: true };
 
-    // 2. Copy the tracks again that are not stored yet.
+    // 2. Copy the tracks that are not stored yet, also the ones that step 1 just completed.
     const retry = inTime() ? await this.repo.retryableTracks(MAX_COPY_ATTEMPTS, LIST_LIMIT) : null;
     if (!retry) return { ...result, stopped: true };
     result.copied = await this.inBatches(retry, (id) => this.copier.copy(id), inTime);

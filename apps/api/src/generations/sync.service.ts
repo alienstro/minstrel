@@ -38,8 +38,11 @@ export class SyncService {
     private readonly background: BackgroundWork,
   ) {}
 
-  /** A read and the sweep pass ifDue, so a row that another sync just polled is not polled again. */
-  async sync(generationId: string, opts: { ifDue?: boolean } = {}): Promise<void> {
+  /**
+   * A read and the sweep pass ifDue, so a row that another sync just polled is not polled again.
+   * The sweep passes startCopies false, because its own copy step copies the tracks in batches.
+   */
+  async sync(generationId: string, opts: { ifDue?: boolean; startCopies?: boolean } = {}): Promise<void> {
     const row = await this.repo.claimLease(generationId, SYNC_LEASE_SECONDS, opts);
     if (!row) return;
 
@@ -87,6 +90,7 @@ export class SyncService {
     }
 
     const copies = await this.save(row, result);
+    if (opts.startCopies === false) return;
     for (const trackId of copies) this.background.run(() => this.copier.copy(trackId));
   }
 
