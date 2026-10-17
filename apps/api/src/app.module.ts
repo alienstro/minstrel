@@ -13,7 +13,7 @@ import { loggerOptions } from './common/logger.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { PgThrottlerStorage } from './common/pg-throttler.storage.js';
 import { authEnvFromProcess, createAuth } from './auth/auth.js';
-import { MAILER, smtpMailerFromEnv, type Mailer } from './auth/mailer.js';
+import { MAILER, mailerFromEnv, type Mailer } from './auth/mailer.js';
 import { AssistController } from './assist/assist.controller.js';
 import { AssistService } from './assist/assist.service.js';
 import { ConnectionsModule } from './connections/connections.module.js';
@@ -30,7 +30,7 @@ const mailerProvider = {
   useFactory: (): Mailer =>
     isFakeMode()
       ? { sendVerification: async () => {}, sendPasswordReset: async () => {} }
-      : smtpMailerFromEnv(),
+      : mailerFromEnv(),
 };
 
 // The webhook route ignores its body (spec §5.3), so the parsers skip it. A bad or large provider

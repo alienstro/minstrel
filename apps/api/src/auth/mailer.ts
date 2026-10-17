@@ -1,4 +1,5 @@
 import { createTransport } from 'nodemailer';
+import { Resend } from 'resend';
 
 export const MAILER = Symbol('MAILER');
 
@@ -22,31 +23,70 @@ export interface MailTransport {
   }): Promise<unknown>;
 }
 
-export class SmtpMailer implements Mailer {
-  constructor(
-    private readonly transport: MailTransport,
-    private readonly from: string,
-  ) {}
-
+/** The two auth emails are plain text. Each provider class only sends them. */
+abstract class PlainTextMailer implements Mailer {
   async sendVerification({ to, url }: MailMessage): Promise<void> {
-    await this.send(
-      to,
-      'Confirm your email for Minstrel',
-      `Open this link to confirm your email: ${url}`,
-    );
+    await this.send(to, 'Confirm your email for Minstrel', `Open this link to confirm your email: ${url}`);
   }
 
   async sendPasswordReset({ to, url }: MailMessage): Promise<void> {
-    await this.send(
-      to,
-      'Reset your Minstrel password',
-      `Open this link to set a new password: ${url}`,
-    );
+    await this.send(to, 'Reset your Minstrel password', `Open this link to set a new password: ${url}`);
   }
 
-  private async send(to: string, subject: string, text: string): Promise<void> {
+  protected abstract send(to: string, subject: string, text: string): Promise<void>;
+}
+
+export class SmtpMailer extends PlainTextMailer {
+  constructor(
+    private readonly transport: MailTransport,
+    private readonly from: string,
+  ) {
+    super();
+  }
+
+  protected async send(to: string, subject: string, text: string): Promise<void> {
     await this.transport.sendMail({ from: this.from, to, subject, text });
   }
+}
+
+/** The part of the Resend SDK that the mailer uses, so a test can give a fake one. */
+export interface ResendClient {
+  emails: {
+    send(message: {
+      from: string;
+      to: string;
+      replyTo?: string;
+      subject: string;
+      text: string;
+    }): Promise<{ error: { name: string; message: string } | null }>;
+  };
+}
+
+export class ResendMailer extends PlainTextMailer {
+  constructor(
+    private readonly client: ResendClient,
+    private readonly from: string,
+    private readonly replyTo?: string,
+  ) {
+    super();
+  }
+
+  protected async send(to: string, subject: string, text: string): Promise<void> {
+    const message = { from: this.from, to, subject, text, ...(this.replyTo ? { replyTo: this.replyTo } : {}) };
+    // The SDK returns an error object in place of a throw.
+    const { error } = await this.client.emails.send(message);
+    if (error) throw new Error(`Resend did not send the email: ${error.name}: ${error.message}`);
+  }
+}
+
+/**
+ * Production sends through Resend. Without RESEND_API_KEY the API uses SMTP, for local
+ * development. EMAIL_REPLY_TO is optional.
+ */
+export function mailerFromEnv(env: Partial<Record<string, string>> = process.env): Mailer {
+  if (!env.RESEND_API_KEY) return smtpMailerFromEnv(env);
+  if (!env.EMAIL_FROM) throw new Error('Set EMAIL_FROM to send email.');
+  return new ResendMailer(new Resend(env.RESEND_API_KEY), env.EMAIL_FROM, env.EMAIL_REPLY_TO);
 }
 
 const REQUIRED = ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'EMAIL_FROM'] as const;

@@ -31,12 +31,13 @@ Set each variable for Production and Preview. No secret uses the `NEXT_PUBLIC_` 
 | Name | Value |
 |---|---|
 | `DATABASE_URL`, `DATABASE_URL_UNPOOLED` | The Neon integration sets them. |
-| `WEB_ORIGIN` | `https://minstrel.<name>.to` |
+| `WEB_ORIGIN` | `https://minstrel.alienstro.xyz` |
 | `CRON_SECRET` | 32 or more random bytes |
 | `BETTER_AUTH_SECRET` | 32 or more random bytes |
 | `KEY_ENCRYPTION_KEYS` | `1:<base64 of 32 random bytes>` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From the Google Cloud console |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | An SMTP account. For Gmail: `smtp.gmail.com`, `465`, the Gmail address, an app password, and `Minstrel <the Gmail address>` |
+| `RESEND_API_KEY` | A Resend API key with Sending access to the verified domain only |
+| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `Minstrel <noreply@alienstro.xyz>` and `robinxaquino@gmail.com` |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | From Cloudflare R2 |
 
 > **Warning:** Do not set `MINSTREL_FAKE_PROVIDERS` on Vercel. It is for the local end-to-end test only.
@@ -53,7 +54,7 @@ Make a random secret with `openssl rand -base64 32`.
 
 1. Add the domain in Vercel. Make the CNAME record in Cloudflare DNS with the proxy off (gray cloud).
    Vercel must issue the certificate and see the real client IP.
-2. In the Google Cloud console, add the redirect URI `https://minstrel.<name>.to/api/auth/callback/google`.
+2. In the Google Cloud console, add the redirect URI `https://minstrel.alienstro.xyz/api/auth/callback/google`.
 
 ## 6. Vercel Firewall
 
