@@ -40,6 +40,10 @@ export async function createTestApp(
   process.env.WEB_ORIGIN = TEST_ORIGIN;
   process.env.BETTER_AUTH_SECRET = 'test-secret-test-secret-test-secret-00';
   process.env.KEY_ENCRYPTION_KEYS = TEST_KEY_ENCRYPTION_KEYS;
+process.env.R2_ACCOUNT_ID ??= 'test-account';
+process.env.R2_ACCESS_KEY_ID ??= 'test-id';
+process.env.R2_SECRET_ACCESS_KEY ??= 'test-secret';
+process.env.R2_BUCKET ??= 'test-bucket';
   const mailer = new FakeMailer();
   const background = new FakeBackgroundWork();
   const moduleRef = await Test.createTestingModule({
