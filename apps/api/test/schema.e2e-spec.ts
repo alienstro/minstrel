@@ -41,7 +41,6 @@ describe('schema (e2e)', () => {
         userId,
         connectionId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         input: { idea: 'rain', instrumental: false, model: 'V6' },
       })

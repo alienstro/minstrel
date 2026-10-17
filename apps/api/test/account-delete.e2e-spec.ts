@@ -46,7 +46,6 @@ describe('account deletion (e2e)', () => {
         userId: ada.userId,
         connectionId: conn.body.id,
         adapter: 'kie',
-        flow: 'job',
         status: 'complete',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
       })

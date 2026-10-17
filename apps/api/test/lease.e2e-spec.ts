@@ -22,7 +22,6 @@ describe('GenerationsRepo lease (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
         ...values,

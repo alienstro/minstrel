@@ -99,7 +99,6 @@ export class GenerationsService {
         userId: conn.userId,
         connectionId: conn.id,
         adapter: conn.adapter,
-        flow: 'job',
         status: 'submitting',
         input,
         callbackTokenHash: token ? hashToken(token) : null,

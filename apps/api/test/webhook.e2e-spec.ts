@@ -35,7 +35,6 @@ describe('POST /api/webhooks/:adapter/:generationId (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         providerTaskId: 'task-1',
         input: { idea: 'a song', instrumental: false, model: 'V5' },

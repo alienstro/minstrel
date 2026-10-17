@@ -27,7 +27,6 @@ describe('daily sweep (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         providerTaskId: `task-${randomUUID()}`,
         input: { idea: 'a song', instrumental: false, model: 'V5' },

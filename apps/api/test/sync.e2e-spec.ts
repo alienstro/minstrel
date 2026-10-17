@@ -36,7 +36,6 @@ describe('SyncService (e2e)', () => {
         userId,
         connectionId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         providerTaskId: 'task-1',
         input: { idea: 'a song about rain', instrumental: false, model: 'V5' },

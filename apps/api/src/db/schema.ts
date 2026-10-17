@@ -34,14 +34,13 @@ const userId = () =>
     .references(() => user.id, { onDelete: 'cascade' });
 
 export const connectionKind = pgEnum('connection_kind', ['music', 'text']);
-export const adapter = pgEnum('adapter', ['kie', 'suno_classic', 'elevenlabs', 'openai_compatible']);
+export const adapter = pgEnum('adapter', ['kie', 'openai_compatible']);
 export const connectionStatus = pgEnum('connection_status', [
   'unchecked',
   'ok',
   'invalid_key',
   'unreachable',
 ]);
-export const generationFlow = pgEnum('generation_flow', ['job', 'direct']);
 export const generationStatus = pgEnum('generation_status', [
   'submitting',
   'pending',
@@ -92,7 +91,6 @@ export const generations = pgTable(
       onDelete: 'set null',
     }),
     adapter: adapter('adapter').notNull(),
-    flow: generationFlow('flow').notNull(),
     providerTaskId: text('provider_task_id'),
     callbackTokenHash: bytea('callback_token_hash'),
     status: generationStatus('status').notNull(),
