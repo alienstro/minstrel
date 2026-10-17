@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ApiExceptionFilter } from './common/api-exception.filter.js';
+import { loggerOptions } from './common/logger.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { authEnvFromProcess, createAuth } from './auth/auth.js';
 import { MAILER, ResendMailer, type Mailer } from './auth/mailer.js';
@@ -26,6 +28,7 @@ class MailerModule {}
 
 @Module({
   imports: [
+    LoggerModule.forRoot({ pinoHttp: loggerOptions() }),
     DbModule,
     // The module registers a global guard: each route needs a session unless it has @AllowAnonymous.
     AuthModule.forRootAsync({

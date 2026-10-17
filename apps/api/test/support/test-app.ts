@@ -19,6 +19,7 @@ export async function createTestApp(
   controllers: Type[] = [],
 ): Promise<TestApp> {
   process.env.DATABASE_URL = TEST_DATABASE_URL;
+  process.env.LOG_LEVEL ??= 'silent';
   process.env.WEB_ORIGIN = TEST_ORIGIN;
   process.env.BETTER_AUTH_SECRET = 'test-secret-test-secret-test-secret-00';
   const mailer = new FakeMailer();
