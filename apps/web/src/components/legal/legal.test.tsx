@@ -14,11 +14,21 @@ describe('PrivacyPolicy', () => {
     }
   });
 
-  it('names each service that processes user data', () => {
+  it('describes each kind of service that processes user data', () => {
     render(<PrivacyPolicy />);
-    for (const service of ['Vercel', 'Neon', 'Cloudflare R2', 'Google']) {
-      expect(screen.getAllByText(new RegExp(service)).length).toBeGreaterThan(0);
+    for (const kind of [/A hosting service/, /A network service/, /A file storage service/, /Google signs you in/]) {
+      expect(screen.getByText(kind)).toBeInTheDocument();
     }
+  });
+
+  it('keeps the tech stack private and names no hosting vendor or tool', () => {
+    const { container } = render(<PrivacyPolicy />);
+    expect(container.textContent).not.toMatch(/Vercel|Neon|Cloudflare|R2|Dokploy|Traefik|Tunnel|Postgres/);
+  });
+
+  it('says that the database backups keep deleted data for at most 14 days', () => {
+    render(<PrivacyPolicy />);
+    expect(screen.getByText(/at most 14 days/)).toBeInTheDocument();
   });
 
   it('names no email service and no password, because Minstrel has Google sign-in only', () => {

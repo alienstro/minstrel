@@ -12,7 +12,8 @@ const signUp = (t: TestApp, email: string) =>
   request(t.app.getHttpServer())
     .post('/api/auth/sign-up/email')
     .set('Origin', TEST_ORIGIN)
-    .set('x-real-ip', '203.0.113.7')
+    .set('x-real-ip', '172.18.0.5')
+    .set('cf-connecting-ip', '203.0.113.7')
     .send({ email, password: 'correct horse battery', name: 'Ada' });
 
 describe('auth (e2e)', () => {
@@ -92,7 +93,20 @@ describe('auth (e2e)', () => {
     expect(session).not.toMatch(/Domain=/i);
   });
 
-  it('Better Auth records the x-real-ip address', async () => {
+  it('Better Auth falls back to x-real-ip when cf-connecting-ip is missing', async () => {
+    await request(t.app.getHttpServer())
+      .post('/api/auth/sign-up/email')
+      .set('Origin', TEST_ORIGIN)
+      .set('x-real-ip', '192.168.1.20')
+      .send({ email: 'lan@example.com', password: 'correct horse battery', name: 'Lan' });
+    const db = t.app.get<Db>(DB);
+    const { rows } = await db.execute<{ ip_address: string }>(
+      sql`SELECT ip_address FROM session`,
+    );
+    expect(rows.map((r) => r.ip_address)).toEqual(['192.168.1.20']);
+  });
+
+  it('Better Auth records the cf-connecting-ip address, not the tunnel address', async () => {
     await signUp(t, 'ada@example.com');
     const db = t.app.get<Db>(DB);
     const { rows } = await db.execute<{ ip_address: string }>(

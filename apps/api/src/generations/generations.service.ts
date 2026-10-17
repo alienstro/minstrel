@@ -60,7 +60,7 @@ export class GenerationsService {
     return toGenerationDto(await this.submitJob(conn, provider, input));
   }
 
-  // Spec §5.3 step 4. Vercel Cron runs once a day on Hobby, so the reads drive the poll. The reply
+  // Spec §5.3 step 4. The sweep runs only once a day, so the reads drive the poll. The reply
   // never waits for the sync. The Studio page reads again 3 s later and sees the new state.
   async get(userId: string, id: string): Promise<GenerationDto> {
     if (!isUuid(id)) throw notFound();

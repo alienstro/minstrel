@@ -6,7 +6,7 @@ import { SweepService, type SweepResult } from './sweep.service.js';
 
 const sha256 = (value: string) => createHash('sha256').update(value).digest();
 
-// Spec §2.3. Vercel Cron calls this route once a day with Authorization: Bearer <CRON_SECRET>.
+// Spec §2.3. A Dokploy schedule calls this route once a day with Authorization: Bearer <CRON_SECRET>.
 @Controller('cron')
 @AllowAnonymous()
 export class SweepController {

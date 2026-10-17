@@ -1,6 +1,6 @@
 import { ApiClientError } from './api';
 
-// A Neon cold start takes some seconds, so the gateway replies 502, 503 or 504, or the fetch fails.
+// While a deploy restarts the API, Traefik can reply 502, 503 or 504, or the fetch fails.
 // The query retries only these temporary failures. A 4xx or a 500 reply shows at once.
 const MAX_TRIES = 6;
 const TEMPORARY_STATUSES = new Set([502, 503, 504]);
