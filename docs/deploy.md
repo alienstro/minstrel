@@ -3,6 +3,9 @@
 Minstrel runs on the private server `root@main` (Ubuntu 24.04) with Dokploy. Cloudflare R2 holds
 the audio files and the database backups. All other parts run on the server.
 
+On 2026-10-17, Minstrel moved here from Vercel and Neon. The Vercel project and the Neon database
+are deleted, and the server database started empty on that date.
+
 The server is behind a router (NAT), so the internet cannot open a connection to it. A Cloudflare
 Tunnel makes an outgoing connection from the server to Cloudflare, and Cloudflare sends the
 traffic back through it. The Dokploy panel stays on Tailscale (`http://100.105.205.7:3000`).
@@ -13,7 +16,7 @@ traffic back through it. The Dokploy panel stays on Tailscale (`http://100.105.2
 | API (`apps/api`) | App `minstrel-api` | `apps/api/Dockerfile`, port 4000, path `/api`, no strip path |
 | Database | Postgres 18 `minstrel-db` | Internal only, no public port |
 | Daily sweep | Schedule on `minstrel-api` | `0 4 * * *`, time zone UTC |
-| Backups | Backup of `minstrel-db` | R2 bucket `minstrel-backups`, daily, 14 kept |
+| Backups | Backup of `minstrel-db` | R2 bucket `minstrel-backups`, daily at 03:00 UTC, 14 kept |
 | Tunnel | App `cloudflared` | Image `cloudflare/cloudflared`, command `tunnel run`, env `TUNNEL_TOKEN` |
 
 **Warning:** The server is an LXC container on Proxmox. Docker Swarm virtual IPs need the kernel IPVS
@@ -56,7 +59,6 @@ its token in the `cloudflared` app as `TUNNEL_TOKEN`, and attach the app to `dok
   get `404`, so the panel login is not on the internet.
 - The API reads the user IP from the `cf-connecting-ip` header. Traefik sets `x-real-ip` to the
   tunnel container, so that header is not the user IP.
-
 - A request without `cf-connecting-ip` falls back to `x-real-ip`, so it still has its own rate
   limit.
 
@@ -79,15 +81,47 @@ those devices.
 Use the names in `apps/api/.env.example`. The Docker image sets `NODE_ENV=production` and
 `PORT=4000`.
 
-**Warning:** `KEY_ENCRYPTION_KEYS`, `BETTER_AUTH_SECRET` and `CRON_SECRET` must keep the values that
-production used before. A different `KEY_ENCRYPTION_KEYS` makes all stored provider keys
-unreadable. A different `BETTER_AUTH_SECRET` signs out all users.
+**Warning:** Do not change `KEY_ENCRYPTION_KEYS` or `BETTER_AUTH_SECRET` by hand. A different
+`KEY_ENCRYPTION_KEYS` makes all stored provider keys unreadable. A different `BETTER_AUTH_SECRET`
+signs out all users. To change the key, follow "Rotate the key encryption key".
 
 - `WEB_ORIGIN=https://minstrel.alienstro.xyz`
 - `DATABASE_URL` and `DATABASE_URL_UNPOOLED`: the internal URL of `minstrel-db`.
 - Do not set `MINSTREL_FAKE_PROVIDERS`. The API does not start with it in production.
 
 `minstrel-web` needs no environment variables.
+
+## Keep a copy of the secrets
+
+Dokploy keeps the env values in its own database, on the same server. The nightly backups in R2
+hold only the Minstrel database, not the env values. So a lost server also loses the secrets, unless
+you keep a copy somewhere else.
+
+| Value | Where it lives | If you lose it |
+|---|---|---|
+| `KEY_ENCRYPTION_KEYS` | `minstrel-api` env | Each user must add their provider key again. Keep a copy. |
+| `BETTER_AUTH_SECRET` | `minstrel-api` env | Each user must sign in again. |
+| `CRON_SECRET` | `minstrel-api` env | Nothing. Make a new one. |
+| Google client secret | `minstrel-api` env | Add a new secret to the "Minstrel production" client. Google shows a secret only once. |
+| R2 tokens | `minstrel-api` env, backup destination | Make a new token in Cloudflare. |
+| Tunnel token | `cloudflared` env | Rotate it in the tunnel settings. |
+| Dokploy API key | GitHub secret `DOKPLOY_API_KEY` | Make a new key in Dokploy. |
+
+- Copy `KEY_ENCRYPTION_KEYS` and `BETTER_AUTH_SECRET` to a password manager each time that they
+  change.
+- Optional: Dokploy can also back up its own data, with all env values, to the same R2 destination.
+
+## Rebuild on a new server
+
+1. Install Dokploy. Connect the GitHub App to `alienstro/minstrel`.
+2. Make `minstrel-db` (Postgres 18), then restore the latest backup from `minstrel-backups`.
+3. Make `minstrel-api`, `minstrel-web` and `cloudflared` as the table above shows. Set `dnsrr` first
+   if the server is LXC.
+4. Put back the env values from your copy. Use the same `KEY_ENCRYPTION_KEYS` and
+   `BETTER_AUTH_SECRET`.
+5. Start `cloudflared` with the tunnel token. The tunnel routes and the DNS stay in Cloudflare, so
+   they need no change.
+6. Update the GitHub secrets `DOKPLOY_API_KEY`, `DOKPLOY_API_APP_ID` and `DOKPLOY_WEB_APP_ID`.
 
 ## Daily sweep schedule
 
@@ -99,12 +133,14 @@ node -e "fetch('http://localhost:4000/api/cron/sweep',{headers:{authorization:'B
 
 ## DNS
 
-The tunnel makes a proxied `CNAME` for each public hostname. Before you add
-`minstrel.alienstro.xyz` to the tunnel, delete the old `minstrel` CNAME that points to Vercel.
+Each tunnel route makes a proxied `CNAME` to the tunnel `main`: `minstrel` and `deploy`. Do not edit
+these records by hand. To remove a hostname, remove its route in the tunnel. The other
+`alienstro.xyz` hostnames use a different tunnel, `my-tunnel`.
 
 ## Restore a backup
 
-1. In Dokploy, open `minstrel-db`, Backups, and pick the backup file.
+1. In Dokploy, open `minstrel-db`, Backups, and pick the backup file. The files are in
+   `minstrel-backups` under `minstrel-db-slrxwz/minstrel-db/`.
 2. Restore it into a scratch database first, and compare the row counts of `user`, `generations`
    and `provider_connections`.
 3. Stop `minstrel-api`, restore into `minstrel-db`, then start `minstrel-api`.
@@ -134,8 +170,8 @@ so this value stays the same.
 
 ## Webhook rate limit (open item)
 
-On Vercel, a Firewall rule allowed 120 requests each minute for each IP on `/api/webhooks/*`
-(spec §7.4). Add a Cloudflare rate limiting rule for that path in place of it. The Free plan
+The spec (§7.4) limits `/api/webhooks/*` to 120 requests each minute for each IP. Add a Cloudflare
+rate limiting rule for that path. The Free plan
 allows one rule with a 10-second period, so use 20 requests each 10 seconds for each IP.
 
 ## Checks before launch
@@ -143,8 +179,7 @@ allows one rule with a 10-second period, so use 20 requests each 10 seconds for 
 1. **Client IP (§7.4).** From one network, send `POST /api/auth/sign-in/social` until Better Auth
    replies `429`. From a second network, sign in with Google at once: it must work. This proves that
    the auth rate limit reads the real client IP from the `cf-connecting-ip` header that Cloudflare
-   sets. Then
-   send 11 songs in one minute from one account. The 11th reply must be `429 rate_limited`.
+   sets. Then send 11 songs in one minute from one account. The 11th reply must be `429 rate_limited`.
 2. **Manual songs (§11).** On the production setup, make one real song with kie.ai. The song
    completes, and both takes play from R2.
 3. **Account deletion.** Delete a test account. Its objects under `users/<userId>/` in R2 must be gone.

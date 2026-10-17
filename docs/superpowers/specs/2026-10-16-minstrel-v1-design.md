@@ -353,6 +353,11 @@ user returns `404`, not `403`, so that IDs do not leak.
 
 Other facts:
 
+- For `kie` and `suno_classic`, the 10–360 s limit applies only to the `duration` field. The docs call
+  `duration` a target length, and the API accepts it only in custom mode. With **Auto** on, or with only an
+  idea, Minstrel sends no `duration`, and the model picks the length. That song can be longer than 360 s
+  (issue #7 saw about 7 minutes). Minstrel keeps the song as the provider makes it and does not cut it. The
+  **Auto** hint tells the user that a song can be longer than the slider maximum.
 - Only paid ElevenLabs plans can use the Music API.
 - ElevenLabs allows 3–600 s, but Minstrel limits ElevenLabs songs to 5–180 s, so that each call ends
   inside the 300 s function limit (§5.4). The test before launch measures a 180 s song (§11).

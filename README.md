@@ -30,7 +30,13 @@ Run one package with a filter, for example `pnpm --filter @minstrel/api dev`.
 
 ## Environment
 
-Copy each `.env.example` file to `.env` in the same folder, then change the values.
+Copy each `.env.example` file to `.env` in the same folder, then change the values. Start the local
+database with `docker compose up -d db`.
+
+## Deploy
+
+Production runs on Dokploy on our own server. A push to `main` deploys it. Read `docs/deploy.md`
+before you change the server, the secrets, or the deploy job.
 
 ## Health check
 
