@@ -1,7 +1,8 @@
 import dns, { type LookupAddress } from 'node:dns';
-import { isIP } from 'node:net';
+import { isIP, type LookupFunction } from 'node:net';
 import {
   Agent,
+  Headers,
   fetch as undiciFetch,
   type RequestInit,
   type Response,
@@ -79,7 +80,7 @@ export function createSafeFetch(
     let current = new URL(url);
     let method = request.method ?? 'GET';
     let body = request.body;
-    const headers = new Headers(request.headers as HeadersInit | undefined);
+    const headers = new Headers(request.headers);
 
     for (let hop = 0; ; hop++) {
       assertSafeUrl(current);
@@ -146,20 +147,17 @@ function assertSafeUrl(url: URL): void {
     throw new SafeFetchError(`The address ${host} is blocked`);
 }
 
-function guardedLookup(lookup: DnsLookup) {
-  return (
-    hostname: string,
-    options: dns.LookupOptions,
-    callback: (...args: unknown[]) => void,
-  ) => {
+function guardedLookup(lookup: DnsLookup): LookupFunction {
+  return (hostname, options, callback) => {
     lookup(hostname, { ...options, all: true }, (error, addresses) => {
-      if (error) return callback(error);
+      if (error) return callback(error, '');
       if (
         addresses.length === 0 ||
         addresses.some((a) => isBlockedAddress(a.address))
       ) {
         return callback(
           new SafeFetchError(`The address of ${hostname} is blocked`),
+          '',
         );
       }
       if (options.all) return callback(null, addresses);
