@@ -1,12 +1,28 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import type { MusicAdapter, ProviderInfo } from '@minstrel/shared';
 import { ApiError } from '../common/api-error.js';
+import { isFakeMode } from '../common/fake-mode.js';
+import { ElevenLabsMusicProvider } from './elevenlabs.music.js';
+import { FakeMusicProvider } from './fake.music.js';
+import { KieMusicProvider } from './kie.music.js';
+import { SunoClassicMusicProvider } from './suno-classic.music.js';
 import type { MusicProvider, TextProvider } from './types.js';
 
 export const MUSIC_PROVIDERS = Symbol('MUSIC_PROVIDERS');
 export const TEXT_PROVIDER = Symbol('TEXT_PROVIDER');
 
-// Spec §3.2. A new music provider needs one class and one entry in MUSIC_PROVIDERS.
+/** The music providers. With MINSTREL_FAKE_PROVIDERS=1, a fake takes the place of kie only. */
+export function musicProvidersFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): MusicProvider[] {
+  return [
+    isFakeMode(env) ? new FakeMusicProvider() : new KieMusicProvider(),
+    new SunoClassicMusicProvider(),
+    new ElevenLabsMusicProvider(),
+  ];
+}
+
+// Spec §3.2. A new music provider needs one class and one entry in musicProvidersFromEnv.
 @Injectable()
 export class ProviderRegistry {
   private readonly musicByAdapter: Map<MusicAdapter, MusicProvider>;

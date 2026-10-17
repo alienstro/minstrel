@@ -8,6 +8,7 @@ import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ApiExceptionFilter } from './common/api-exception.filter.js';
 import { BackgroundWorkModule } from './common/background-work.js';
+import { isFakeMode } from './common/fake-mode.js';
 import { loggerOptions } from './common/logger.js';
 import { OriginGuard } from './common/origin.guard.js';
 import { PgThrottlerStorage } from './common/pg-throttler.storage.js';
@@ -25,11 +26,11 @@ import { TracksModule } from './tracks/tracks.module.js';
 
 const mailerProvider = {
   provide: MAILER,
+  // The local end-to-end test sends no email. It marks the user as verified in the database.
   useFactory: (): Mailer =>
-    new ResendMailer(
-      process.env.RESEND_API_KEY ?? '',
-      process.env.EMAIL_FROM ?? '',
-    ),
+    isFakeMode()
+      ? { sendVerification: async () => {}, sendPasswordReset: async () => {} }
+      : new ResendMailer(process.env.RESEND_API_KEY ?? '', process.env.EMAIL_FROM ?? ''),
 };
 
 // The webhook route ignores its body (spec §5.3), so the parsers skip it. A bad or large provider
