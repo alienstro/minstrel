@@ -8,14 +8,6 @@ const caps = { lyrics: true, style: true, providerTitle: true, instrumental: tru
 const kieCaps = { ...caps, lengthSeconds: { min: 10, max: 360 }, lengthAuto: true, lengthNeedsCustomMode: true };
 const providers: ProviderInfo[] = [
   { adapter: 'kie', kind: 'music', displayName: 'kie.ai', defaultBaseUrl: '', keyUrl: '', capabilities: kieCaps },
-  {
-    adapter: 'elevenlabs',
-    kind: 'music',
-    displayName: 'ElevenLabs Music',
-    defaultBaseUrl: '',
-    keyUrl: '',
-    capabilities: { ...caps, providerTitle: false, lengthSeconds: { min: 5, max: 180 }, tracksPerRequest: 1 },
-  },
 ];
 
 const connection = (id: string, adapter: ConnectionDto['adapter'], label: string): ConnectionDto => ({
@@ -33,12 +25,10 @@ const connection = (id: string, adapter: ConnectionDto['adapter'], label: string
 
 const connections = [
   connection('c-kie', 'kie', 'kie.ai'),
-  connection('c-el', 'elevenlabs', 'ElevenLabs'),
   { ...connection('c-text', 'openai_compatible', 'OpenRouter'), defaultModel: 'openai/gpt-5-mini' },
 ];
 const models = {
-  'c-kie': [{ id: 'V6', label: 'V6' }],
-  'c-el': [{ id: 'music_v2_5', label: 'Music v2.5' }],
+  'c-kie': [{ id: 'V6', label: 'V6' }, { id: 'V5', label: 'V5' }],
   'c-text': [
     { id: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
     { id: 'meta-llama/llama-4', label: 'Llama 4' },
@@ -71,12 +61,12 @@ describe('SongForm', () => {
     expect(picker).toHaveAccessibleDescription('Choose a model.');
   });
 
-  it('an ElevenLabs model shows the Length slider with min 5, max 180, step 5, value 150', async () => {
+  it('a kie model shows the Length slider with min 10, max 360, step 5, value 150', async () => {
     renderForm();
-    await pickModel('music');
+    await pickModel('V6');
     const slider = screen.getByRole('slider', { name: /length/i });
-    expect(slider).toHaveAttribute('min', '5');
-    expect(slider).toHaveAttribute('max', '180');
+    expect(slider).toHaveAttribute('min', '10');
+    expect(slider).toHaveAttribute('max', '360');
     expect(slider).toHaveAttribute('step', '5');
     expect(slider).toHaveValue('150');
   });
@@ -113,7 +103,7 @@ describe('SongForm', () => {
     renderForm();
     await pickModel('V6');
     await userEvent.type(screen.getByLabelText('Lyrics'), 'Drip drop');
-    await pickModel('music');
+    await pickModel('V5');
     await pickModel('V6');
     expect(screen.getByLabelText('Lyrics')).toHaveValue('Drip drop');
   });

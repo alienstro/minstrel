@@ -15,8 +15,6 @@ const capabilities = {
 
 const providers: ProviderInfo[] = [
   { adapter: 'kie', kind: 'music', displayName: 'kie.ai', defaultBaseUrl: 'https://api.kie.ai', keyUrl: 'https://kie.ai/api-key', capabilities },
-  { adapter: 'suno_classic', kind: 'music', displayName: 'Suno-compatible', defaultBaseUrl: 'https://apibox.erweima.ai', keyUrl: 'https://sunoapi.org/api-key', capabilities },
-  { adapter: 'elevenlabs', kind: 'music', displayName: 'ElevenLabs Music', defaultBaseUrl: 'https://api.elevenlabs.io', keyUrl: 'https://elevenlabs.io/app/settings/api-keys', capabilities: { ...capabilities, lengthSeconds: { min: 5, max: 180 }, tracksPerRequest: 1 } },
   { adapter: 'openai_compatible', kind: 'text', displayName: 'OpenAI-compatible', defaultBaseUrl: 'https://api.openai.com/v1', keyUrl: 'https://platform.openai.com/api-keys', capabilities: null },
 ];
 
@@ -44,16 +42,12 @@ describe('ConnectionsSettings', () => {
     expect(await screen.findByText('Add a music provider key to make songs.')).toBeInTheDocument();
   });
 
-  it('the empty state lists kie.ai, Suno-compatible, and ElevenLabs Music with key links', async () => {
+  it('the empty state lists kie.ai with its key link', async () => {
     fakeApi({ 'GET /api/connections': [], 'GET /api/providers': providers });
     renderWithQuery(<ConnectionsSettings />);
     const list = await screen.findByRole('list', { name: 'Music providers' });
     const links = within(list).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual([
-      'Get a kie.ai key',
-      'Get a Suno-compatible key',
-      'Get a ElevenLabs Music key',
-    ]);
+    expect(links.map((l) => l.textContent)).toEqual(['Get a kie.ai key']);
     expect(links[0]).toHaveAttribute('href', 'https://kie.ai/api-key');
   });
 

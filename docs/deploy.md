@@ -75,10 +75,8 @@ The Vercel docs do not state these items for services. Check each one and write 
    `429`. From a second network, sign in at once: it must work. This proves that the auth rate limit
    reads the real client IP from `x-real-ip`. Then send 11 songs in one minute from one account. The 11th
    reply must be `429 rate_limited`.
-2. **Manual songs (§11).** On the production setup, make one real song with each adapter:
-   - kie.ai: the song completes, and both takes play from R2.
-   - A Suno-compatible service: the song completes, and both takes play from R2.
-   - ElevenLabs: a 180 s song finishes in less than 240 s. Write the measured time here.
+2. **Manual songs (§11).** On the production setup, make one real song with kie.ai. The song
+   completes, and both takes play from R2.
 3. **Account deletion.** Delete a test account. Its objects under `users/<userId>/` in R2 must be gone.
 
 ## 9. Rotate the key encryption key (§7.1)

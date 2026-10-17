@@ -32,15 +32,15 @@ function stickers(left: Photos, right: Photos): { left: Sticker[]; right: Sticke
     { kind: 'tag', r: -4, text: 'kie.ai' },
     { kind: 'badge', r: 6 },
     { kind: 'photo', r: -3, img: left[2] },
-    { kind: 'tag', r: 3, text: 'ElevenLabs' },
+    { kind: 'tag', r: 3, text: 'Your key' },
     { kind: 'star', r: -10, d: SMALL_STAR },
   ];
   const swap: Record<string, string> = {
     [left[0]]: right[0],
     [left[1]]: right[1],
     [left[2]]: right[2],
-    'kie.ai': 'Suno',
-    ElevenLabs: 'OpenRouter',
+    'kie.ai': 'Lyrics',
+    'Your key': 'OpenRouter',
   };
   const mirrored = [...base.slice(3), ...base.slice(0, 3)].map((s): Sticker => {
     if (s.kind === 'photo') return { ...s, r: -s.r, img: swap[s.img] ?? s.img };
