@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "nest build && node scripts/bundle.mjs && node scripts/migrate-on-vercel.mjs",
+    "build": "nest build && node scripts/bundle.mjs",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -35,7 +35,6 @@
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/throttler": "^6.7.1",
     "@thallesp/nestjs-better-auth": "^2.8.0",
-    "@vercel/functions": "^3.10.1",
     "better-auth": "^1.7.10",
     "drizzle-orm": "^0.45.4",
     "nestjs-pino": "^5.3.1",
