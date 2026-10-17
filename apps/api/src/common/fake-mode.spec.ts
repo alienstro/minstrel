@@ -8,11 +8,11 @@ describe('isFakeMode', () => {
 
   it('is on with the flag outside production', () => {
     expect(isFakeMode({ MINSTREL_FAKE_PROVIDERS: '1' })).toBe(true);
-    expect(isFakeMode({ MINSTREL_FAKE_PROVIDERS: '1', VERCEL_ENV: 'preview' })).toBe(true);
+    expect(isFakeMode({ MINSTREL_FAKE_PROVIDERS: '1', NODE_ENV: 'development' })).toBe(true);
   });
 
   it('refuses to start with the flag in production', () => {
-    expect(() => isFakeMode({ MINSTREL_FAKE_PROVIDERS: '1', VERCEL_ENV: 'production' })).toThrow(
+    expect(() => isFakeMode({ MINSTREL_FAKE_PROVIDERS: '1', NODE_ENV: 'production' })).toThrow(
       /MINSTREL_FAKE_PROVIDERS/,
     );
   });

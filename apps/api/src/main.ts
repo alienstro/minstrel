@@ -12,9 +12,9 @@ async function bootstrap() {
   });
   app.useLogger(app.get(Logger));
   configureApp(app);
+  // Docker sends SIGTERM on a deploy. Nest then lets the background work finish and closes the pool.
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 4000);
 }
-// No top-level await. Vercel imports this file and replaces listen() with a stub that never
-// calls back, so an await here keeps the import open until the function times out.
 // A failed start is an unhandled rejection, which stops Node with the error.
 void bootstrap();
