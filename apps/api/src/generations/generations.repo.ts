@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { afterCursor, cursorTime, decodeCursor } from '../common/cursor.js';
 import { DB, type Db } from '../db/db.module.js';
 import { generations, tracks } from '../db/schema.js';
 import { JOB_DUE_STATES } from './rules.js';
@@ -92,21 +93,17 @@ export class GenerationsRepo {
     return found ?? null;
   }
 
-  /**
-   * A page of the user's generations, newest first. The cursor is the ID of the last row of the
-   * previous page. The database compares its exact created_at, so no row is skipped or repeated.
-   */
-  pageForUser(userId: string, limit: number, cursor?: string): Promise<GenerationRow[]> {
+  /** A page of the user's generations, newest first, with one extra row (see toPage). */
+  pageForUser(userId: string, limit: number, cursor?: string) {
     const after = cursor
-      ? sql`(${generations.createdAt}, ${generations.id}) < (
-          SELECT g.created_at, g.id FROM generations g WHERE g.id = ${cursor} AND g.user_id = ${userId})`
+      ? afterCursor(generations.createdAt, generations.id, decodeCursor(cursor))
       : undefined;
     return this.db
-      .select()
+      .select({ row: generations, cursorTime: cursorTime(generations.createdAt) })
       .from(generations)
       .where(and(eq(generations.userId, userId), after))
       .orderBy(desc(generations.createdAt), desc(generations.id))
-      .limit(limit);
+      .limit(limit + 1);
   }
 
   /** The tracks of the generations, in the order the provider gave them. */

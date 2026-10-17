@@ -11,6 +11,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import type { PgUpdateSetSource } from 'drizzle-orm/pg-core';
 import { ApiError, notFound } from '../common/api-error.js';
+import { toPage } from '../common/cursor.js';
 import { isUuid } from '../common/is-uuid.js';
 import { BackgroundWork } from '../common/background-work.js';
 import { ConnectionsService } from '../connections/connections.service.js';
@@ -73,22 +74,14 @@ export class GenerationsService {
   }
 
   async list(userId: string, cursor?: string): Promise<Page<GenerationDto>> {
-    if (cursor !== undefined && !isUuid(cursor)) {
-      throw new ApiError(400, 'invalid_input', 'This page link is not valid.', { cursor: 'Not valid.' });
-    }
-    // One extra row tells if a next page exists.
-    const rows = await this.repo.pageForUser(userId, PAGE_SIZE + 1, cursor);
-    const page = rows.slice(0, PAGE_SIZE);
+    const rows = await this.repo.pageForUser(userId, PAGE_SIZE, cursor);
     for (const due of await this.repo.dueJobGenerations(MAX_SYNCS_PER_LIST, userId)) {
       this.scheduleSync(due.id);
     }
-    const trackRows = await this.repo.tracksOf(page.map((g) => g.id));
-    return {
-      items: page.map((g) =>
-        toGenerationDto(g, trackRows.filter((t) => t.generationId === g.id)),
-      ),
-      nextCursor: rows.length > PAGE_SIZE ? page.at(-1)!.id : null,
-    };
+    const trackRows = await this.repo.tracksOf(rows.slice(0, PAGE_SIZE).map((r) => r.row.id));
+    return toPage(rows, PAGE_SIZE, (g) =>
+      toGenerationDto(g, trackRows.filter((t) => t.generationId === g.id)),
+    );
   }
 
   private scheduleSync(id: string): void {

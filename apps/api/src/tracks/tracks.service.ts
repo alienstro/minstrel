@@ -1,7 +1,8 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { renameTrackBodySchema, type Page, type TrackDto } from '@minstrel/shared';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { ApiError, notFound } from '../common/api-error.js';
+import { afterCursor, cursorTime, decodeCursor, toPage } from '../common/cursor.js';
 import { isUuid } from '../common/is-uuid.js';
 import { DB, type Db } from '../db/db.module.js';
 import { tracks } from '../db/schema.js';
@@ -21,27 +22,18 @@ export class TracksService {
     @Inject(AUDIO_STORE) private readonly store: AudioStore,
   ) {}
 
-  /** The Library, newest first. The cursor is the ID of the last track of the previous page. */
+  /** The Library, newest first. */
   async list(userId: string, cursor?: string): Promise<Page<TrackDto>> {
-    if (cursor !== undefined && !isUuid(cursor)) {
-      throw new ApiError(400, 'invalid_input', 'This page link is not valid.', { cursor: 'Not valid.' });
-    }
     const after = cursor
-      ? sql`(${tracks.createdAt}, ${tracks.id}) < (
-          SELECT t.created_at, t.id FROM tracks t WHERE t.id = ${cursor} AND t.user_id = ${userId})`
+      ? afterCursor(tracks.createdAt, tracks.id, decodeCursor(cursor))
       : undefined;
-    // One extra row tells if a next page exists.
     const rows = await this.db
-      .select()
+      .select({ row: tracks, cursorTime: cursorTime(tracks.createdAt) })
       .from(tracks)
       .where(and(eq(tracks.userId, userId), after))
       .orderBy(desc(tracks.createdAt), desc(tracks.id))
       .limit(PAGE_SIZE + 1);
-    const page = rows.slice(0, PAGE_SIZE);
-    return {
-      items: page.map(toTrackDto),
-      nextCursor: rows.length > PAGE_SIZE ? page.at(-1)!.id : null,
-    };
+    return toPage(rows, PAGE_SIZE, toTrackDto);
   }
 
   async rename(userId: string, id: string, title: string): Promise<TrackDto> {

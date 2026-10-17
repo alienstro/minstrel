@@ -78,11 +78,29 @@ describe('TracksService (e2e)', () => {
 
     const first = await service.list(userId);
     expect(first.items.map((x) => x.id)).toEqual(newestFirst.slice(0, 50));
-    expect(first.nextCursor).toBe(first.items.at(-1)!.id);
+    expect(first.nextCursor).toEqual(expect.any(String));
 
     const second = await service.list(userId, first.nextCursor!);
     expect(second.items.map((x) => x.id)).toEqual(newestFirst.slice(50));
     expect(second.nextCursor).toBeNull();
+  });
+
+  it('a deleted cursor row does not end the list', async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 52; i++) {
+      ids.push(await insertTrack({ createdAt: sql`now() - make_interval(secs => ${100 - i})` }));
+    }
+    const first = await service.list(userId);
+    // The user deletes the last song of the page before "Show more".
+    await service.remove(userId, first.items.at(-1)!.id);
+
+    const second = await service.list(userId, first.nextCursor!);
+
+    expect(second.items.map((x) => x.id)).toEqual([ids[1], ids[0]]);
+  });
+
+  it('a cursor that is not valid gives 400', async () => {
+    await expect(service.list(userId, 'not-a-cursor')).rejects.toMatchObject({ status: 400 });
   });
 
   it('rename changes the title', async () => {
