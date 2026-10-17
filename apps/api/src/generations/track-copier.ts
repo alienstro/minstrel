@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { DB, type Db } from '../db/db.module.js';
 import { tracks } from '../db/schema.js';
 import { SAFE_FETCH, type SafeFetch } from '../net/safe-fetch.js';
@@ -14,6 +14,9 @@ import {
 
 // Spec §5.5.
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
+
+// A sync and a sweep can copy one track at the same time. A late result must not undo a stored copy.
+const notStored = (trackId: string) => and(eq(tracks.id, trackId), ne(tracks.storageStatus, 'stored'));
 
 @Injectable()
 export class TrackCopier {
@@ -35,7 +38,7 @@ export class TrackCopier {
       await this.db
         .update(tracks)
         .set({ storageStatus: 'copy_failed', copyAttempts: sql`${tracks.copyAttempts} + 1` })
-        .where(eq(tracks.id, trackId));
+        .where(notStored(trackId));
       return;
     }
 
@@ -51,7 +54,7 @@ export class TrackCopier {
         providerAudioUrl: null,
         providerCoverUrl: null,
       })
-      .where(eq(tracks.id, trackId));
+      .where(notStored(trackId));
   }
 
   private async copyAudio(userId: string, trackId: string, url: string): Promise<string> {

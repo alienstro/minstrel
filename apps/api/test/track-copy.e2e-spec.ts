@@ -26,7 +26,8 @@ function bodyOf(size: number): ReadableStream<Uint8Array> {
   });
 }
 
-type Reply = { status?: number; type: string; size: number };
+/** `after` holds the reply back, so a test can order two copies. */
+type Reply = { status?: number; type: string; size: number; after?: Promise<unknown> };
 
 describe('TrackCopier (e2e)', () => {
   let t: TestApp;
@@ -34,11 +35,16 @@ describe('TrackCopier (e2e)', () => {
   let copier: TrackCopier;
   let userId: string;
   let trackId: string;
-  const replies = new Map<string, Reply>();
+  // A list gives one reply for each call, in order.
+  const replies = new Map<string, Reply | Reply[]>();
+  const fetched: string[] = [];
 
   const fetch: SafeFetch = async (url) => {
-    const reply = replies.get(url);
+    const entry = replies.get(url);
+    const reply = Array.isArray(entry) ? entry.shift() : entry;
     if (!reply) throw new Error(`unexpected fetch ${url}`);
+    fetched.push(url);
+    await reply.after;
     return new Response(bodyOf(reply.size), {
       status: reply.status ?? 200,
       headers: { 'content-type': reply.type },
@@ -60,6 +66,7 @@ describe('TrackCopier (e2e)', () => {
     await resetTestDb();
     t.audioStore.objects.clear();
     replies.clear();
+    fetched.length = 0;
     userId = await insertUser(db);
     const [generation] = await db
       .insert(generations)
@@ -150,6 +157,33 @@ describe('TrackCopier (e2e)', () => {
     });
     expect([...t.audioStore.objects.keys()]).toEqual([row.audioKey]);
     expect(t.audioStore.objects.get(row.audioKey!)).toMatchObject({ contentType: 'audio/mpeg' });
+  });
+
+  it('a late failed copy does not undo a stored copy', async () => {
+    // The two copies overlap: the second reads the row while the first downloads.
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    replies.set(AUDIO_URL, [
+      { type: 'audio/mpeg', size: 1024, after: new Promise<void>((resolve) => (releaseFirst = resolve)) },
+      { status: 500, type: 'text/plain', size: 5, after: new Promise<void>((resolve) => (releaseSecond = resolve)) },
+    ]);
+    replies.set(COVER_URL, { type: 'image/jpeg', size: 512 });
+
+    const first = copier.copy(trackId);
+    await vi.waitFor(() => expect(fetched).toHaveLength(1));
+    const second = copier.copy(trackId);
+    await vi.waitFor(() => expect(fetched).toHaveLength(2));
+    releaseFirst();
+    await first;
+    releaseSecond();
+    await second;
+
+    expect(await track()).toMatchObject({
+      storageStatus: 'stored',
+      audioKey: `users/${userId}/tracks/${trackId}.mp3`,
+      providerAudioUrl: null,
+      copyAttempts: 0,
+    });
   });
 
   it('a stored track is not copied again', async () => {
