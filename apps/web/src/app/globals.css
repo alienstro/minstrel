@@ -513,6 +513,80 @@
     animation: dot-pulse 2s linear infinite;
   }
 
+  /* The song progress bar. A stripe moves in the filled part while the song runs. */
+  .song-bar {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--cream2);
+  }
+
+  .song-bar > span {
+    display: block;
+    min-width: 6px;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--ink);
+    transition: width 0.4s ease-out;
+  }
+
+  .song-bar[data-running="true"] > span {
+    background:
+      repeating-linear-gradient(-45deg, rgb(255 255 255 / 22%) 0 6px, transparent 6px 12px) 0 0 / 34px 100%,
+      var(--ink);
+    animation: bar-stripe 0.9s linear infinite;
+  }
+
+  /* The step marks: a check in a dark circle, a turning ring, or an empty ring. */
+  .stage-mark {
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+  }
+
+  .stage-done {
+    background: var(--ink);
+    color: #ffffff;
+  }
+
+  .stage-current {
+    border: 2px solid var(--cream3);
+    border-top-color: var(--ink);
+    animation: disc-spin 0.9s linear infinite;
+  }
+
+  .stage-todo {
+    border: 2px solid var(--cream3);
+  }
+
+  /* An off slider looks off: a gray track and a gray thumb. */
+  .seek:disabled {
+    cursor: not-allowed;
+  }
+
+  .seek:disabled::-webkit-slider-runnable-track {
+    background: var(--cream2);
+  }
+
+  .seek:disabled::-webkit-slider-thumb {
+    background: var(--cream3);
+  }
+
+  .seek:disabled::-moz-range-track {
+    background: var(--cream2);
+  }
+
+  .seek:disabled::-moz-range-progress {
+    background: var(--cream3);
+  }
+
+  .seek:disabled::-moz-range-thumb {
+    background: var(--cream3);
+  }
+
   /* Older classes. They take the canvas look until each screen moves to the canvas markup. */
   .type-page-title {
     font-family: var(--font-serif);
@@ -660,6 +734,12 @@
 }
 
 /* A new take grows into the Takes list. */
+@keyframes bar-stripe {
+  to {
+    background-position: 34px 0, 0 0;
+  }
+}
+
 @keyframes take-enter {
   from {
     opacity: 0;
@@ -677,5 +757,10 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .song-bar[data-running="true"] > span,
+  .stage-current {
+    animation: none;
   }
 }

@@ -105,4 +105,29 @@ describe('TakesPanel', () => {
     expect(takes[1]).toHaveTextContent(/The Cat Who Sailed.*3:02/);
     expect(within(takes[0]!).getByRole('button', { name: 'Play take 1' })).toBeInTheDocument();
   });
+
+  it('the progress bar shows 1 of 3 when the words are ready', () => {
+    fakeApi({ 'GET /api/generations/g-1': generation('text_ready') });
+    renderPanel([generation('text_ready')]);
+    const bar = screen.getByRole('progressbar', { name: 'Song progress' });
+    expect(bar).toHaveAttribute('aria-valuemin', '0');
+    expect(bar).toHaveAttribute('aria-valuemax', '3');
+    expect(bar).toHaveAttribute('aria-valuenow', '1');
+  });
+
+  it('the status line shows the time since the song started', async () => {
+    vi.setSystemTime(new Date('2026-10-17T10:01:05.000Z'));
+    fakeApi({ 'GET /api/generations/g-1': generation('pending') });
+    renderPanel([generation('pending')]);
+    expect(screen.getByText('Making your song · 1:05')).toBeInTheDocument();
+    await act(() => vi.advanceTimersByTimeAsync(1000));
+    expect(screen.getByText('Making your song · 1:06')).toBeInTheDocument();
+  });
+
+  it('a finished song shows Song ready and 3 of 3', () => {
+    fakeApi({});
+    renderPanel([generation('complete', { tracks: [track('t-1', 161)] })]);
+    expect(screen.getByText('Song ready')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Song progress' })).toHaveAttribute('aria-valuenow', '3');
+  });
 });
