@@ -1,6 +1,6 @@
 import type { SafeFetch } from '../net/safe-fetch.js';
 import { errorFromResponse, mapProviderError } from './provider-error.js';
-import type { DecryptedConnection } from './types.js';
+import type { ConnectionCheck, DecryptedConnection } from './types.js';
 
 const API_TIMEOUT_MS = 30_000;
 
@@ -41,4 +41,23 @@ export async function callEnvelope<T>(
       conn.label,
     );
   return body.data as T;
+}
+
+/** A key check with a cheap read, for example the credit balance. */
+export async function checkEnvelope(
+  fetch: SafeFetch,
+  conn: DecryptedConnection,
+  path: string,
+): Promise<ConnectionCheck> {
+  try {
+    await callEnvelope<unknown>(fetch, conn, path);
+    return { ok: true };
+  } catch (error) {
+    const { code, message } = error as { code?: string; message: string };
+    return {
+      ok: false,
+      status: code === 'invalid_key' ? 'invalid_key' : 'unreachable',
+      message,
+    };
+  }
 }

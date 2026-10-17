@@ -8,7 +8,8 @@ import {
   safeFetch as defaultSafeFetch,
   type SafeFetch,
 } from '../net/safe-fetch.js';
-import { callEnvelope } from './envelope.js';
+import { callEnvelope, checkEnvelope } from './envelope.js';
+import { sunoMode } from './suno-mode.js';
 import type {
   ConnectionCheck,
   DecryptedConnection,
@@ -62,18 +63,8 @@ export class KieMusicProvider implements JobMusicProvider {
     return MODELS;
   }
 
-  async checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck> {
-    try {
-      await callEnvelope<number>(this.fetch, conn, '/api/v1/chat/credit');
-      return { ok: true };
-    } catch (error) {
-      const { code, message } = error as { code?: string; message: string };
-      return {
-        ok: false,
-        status: code === 'invalid_key' ? 'invalid_key' : 'unreachable',
-        message,
-      };
-    }
+  checkConnection(conn: DecryptedConnection): Promise<ConnectionCheck> {
+    return checkEnvelope(this.fetch, conn, '/api/v1/chat/credit');
   }
 
   async submit(
@@ -119,14 +110,8 @@ export class KieMusicProvider implements JobMusicProvider {
   }
 }
 
-// Custom mode sings the given lyrics, or makes an instrumental in the given style. It needs a title.
-// Without lyrics, the non-custom mode writes lyrics from the idea.
 export function toKieInput(input: GenerationInput): Record<string, unknown> {
-  const lyrics = input.instrumental
-    ? undefined
-    : input.lyrics?.trim() || undefined;
-  const custom =
-    Boolean(lyrics) || (input.instrumental && Boolean(input.style));
+  const { custom, lyrics, title } = sunoMode(input);
   if (!custom) {
     return {
       custom_mode: false,
@@ -140,7 +125,7 @@ export function toKieInput(input: GenerationInput): Record<string, unknown> {
     custom_mode: true,
     instrumental: input.instrumental,
     model: input.model,
-    title: input.title || input.idea.slice(0, 80),
+    title,
     ...(lyrics ? { lyrics } : {}),
     ...(input.style ? { style: input.style } : {}),
     ...(input.lengthSeconds ? { duration: input.lengthSeconds } : {}),
