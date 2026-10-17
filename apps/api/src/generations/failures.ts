@@ -27,3 +27,8 @@ export const contentRejected = (label: string): Failure => ({
   code: 'content_rejected',
   message: `${label} did not accept some words in the lyrics or the style. Change them, then try again.`,
 });
+
+export const interrupted = (label: string): Failure => ({
+  code: 'interrupted',
+  message: `Minstrel stopped while ${label} made this song. Minstrel did not send the request again, so you were not charged twice. Press Make song to try again.`,
+});

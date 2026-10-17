@@ -2,6 +2,7 @@ import { inputSchemaFor, type MusicAdapter } from '@minstrel/shared';
 import type {
   ConnectionCheck,
   DecryptedConnection,
+  DirectMusicProvider,
   JobMusicProvider,
   MusicTaskResult,
   TextProvider,
@@ -44,6 +45,37 @@ export function fakeJobProvider(
       state: 'pending',
       tracks: [],
     }),
+    ...overrides,
+  };
+}
+
+export function fakeDirectProvider(
+  overrides: Partial<DirectMusicProvider> = {},
+): DirectMusicProvider {
+  return {
+    adapter: 'elevenlabs',
+    flow: 'direct',
+    displayName: 'Fake ElevenLabs',
+    defaultBaseUrl: 'https://elevenlabs.example.com',
+    keyUrl: 'https://elevenlabs.example.com/keys',
+    capabilities: {
+      lyrics: true,
+      style: true,
+      providerTitle: false,
+      instrumental: true,
+      lengthSeconds: { min: 5, max: 180 },
+      tracksPerRequest: 1,
+    },
+    inputSchema: inputSchemaFor('elevenlabs'),
+    checkConnection: check,
+    listModels: () => [{ id: 'music_v2_5', label: 'Music v2.5' }],
+    compose: async () => [
+      {
+        body: new Response(new Uint8Array([1, 2, 3])).body!,
+        contentType: 'audio/mpeg',
+        durationSeconds: 150,
+      },
+    ],
     ...overrides,
   };
 }

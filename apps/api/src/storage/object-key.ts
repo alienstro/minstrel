@@ -3,6 +3,10 @@
 
 const DEFAULT_AUDIO = 'audio/mpeg';
 
+// Spec §5.5: the copy stops when a file is larger.
+export const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
+export const COVER_MAX_BYTES = 5 * 1024 * 1024;
+
 /** Keeps a provider type that starts with audio/. Any other type becomes audio/mpeg. */
 export function normalizeAudioType(type: string | null | undefined): string {
   const base = (type ?? '').split(';')[0]!.trim().toLowerCase();

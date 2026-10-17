@@ -4,11 +4,15 @@ import { DB, type Db } from '../db/db.module.js';
 import { tracks } from '../db/schema.js';
 import { SAFE_FETCH, type SafeFetch } from '../net/safe-fetch.js';
 import { AUDIO_STORE, type AudioStore } from '../storage/audio-store.js';
-import { normalizeAudioType, trackAudioKey, trackCoverKey } from '../storage/object-key.js';
+import {
+  AUDIO_MAX_BYTES,
+  COVER_MAX_BYTES,
+  normalizeAudioType,
+  trackAudioKey,
+  trackCoverKey,
+} from '../storage/object-key.js';
 
 // Spec §5.5.
-const AUDIO_MAX_BYTES = 50 * 1024 * 1024;
-const COVER_MAX_BYTES = 5 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 5 * 60_000;
 
 @Injectable()

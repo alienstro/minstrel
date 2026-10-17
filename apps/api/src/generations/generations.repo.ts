@@ -66,7 +66,7 @@ export class GenerationsRepo {
   }
 
   /** Direct generations in running whose lease has expired, for example after the instance stopped. */
-  expiredRunning(limit: number): Promise<GenerationRow[]> {
+  expiredRunning(limit: number, userId?: string): Promise<GenerationRow[]> {
     return this.db
       .select()
       .from(generations)
@@ -75,6 +75,7 @@ export class GenerationsRepo {
           eq(generations.flow, 'direct'),
           eq(generations.status, 'running'),
           lt(generations.leaseUntil, sql`now()`),
+          userId ? eq(generations.userId, userId) : undefined,
         ),
       )
       .orderBy(asc(generations.createdAt))
