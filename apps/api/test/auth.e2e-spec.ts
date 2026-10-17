@@ -12,7 +12,8 @@ const signUp = (t: TestApp, email: string) =>
   request(t.app.getHttpServer())
     .post('/api/auth/sign-up/email')
     .set('Origin', TEST_ORIGIN)
-    .set('x-real-ip', '203.0.113.7')
+    .set('x-real-ip', '172.18.0.5')
+    .set('cf-connecting-ip', '203.0.113.7')
     .send({ email, password: 'correct horse battery', name: 'Ada' });
 
 describe('auth (e2e)', () => {
@@ -92,7 +93,7 @@ describe('auth (e2e)', () => {
     expect(session).not.toMatch(/Domain=/i);
   });
 
-  it('Better Auth records the x-real-ip address', async () => {
+  it('Better Auth records the cf-connecting-ip address, not the tunnel address', async () => {
     await signUp(t, 'ada@example.com');
     const db = t.app.get<Db>(DB);
     const { rows } = await db.execute<{ ip_address: string }>(

@@ -19,10 +19,13 @@ class LimitedController {
   }
 }
 
-const hit = (t: TestApp) =>
+// Behind the Cloudflare Tunnel, Traefik sets x-real-ip to the tunnel container for every request,
+// and Cloudflare sends the user IP in cf-connecting-ip.
+const hit = (t: TestApp, ip = '198.51.100.9') =>
   request(t.app.getHttpServer())
     .get('/api/limited')
-    .set('x-real-ip', '198.51.100.9');
+    .set('x-real-ip', '172.18.0.5')
+    .set('cf-connecting-ip', ip);
 
 describe('rate limits on Postgres (e2e)', () => {
   let a: TestApp;
@@ -46,6 +49,13 @@ describe('rate limits on Postgres (e2e)', () => {
     expect((await hit(a)).status).toBe(200);
     expect((await hit(b)).status).toBe(200);
     expect((await hit(a)).status).toBe(429);
+  });
+
+  it('each Cloudflare client IP gets its own count', async () => {
+    await hit(a);
+    await hit(a);
+    expect((await hit(a)).status).toBe(429);
+    expect((await hit(a, '203.0.113.50')).status).toBe(200);
   });
 
   it('the request over the limit gives 429 rate_limited', async () => {
