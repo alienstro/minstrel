@@ -1,0 +1,10 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "passThroughEnv": ["VERCEL", "DATABASE_URL", "DATABASE_URL_UNPOOLED"],
+      "cache": false
+    }
+  }
+}
