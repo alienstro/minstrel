@@ -20,7 +20,7 @@ test('sign up, add a fake connection, make a song, and play it', async ({ page }
   await expect(page.getByRole('status')).toContainText('Key added');
 
   await page.goto('/studio');
-  await page.getByLabel('Idea').fill('a sea shanty about a lost cat');
+  await page.getByLabel('What is the song about?').fill('a sea shanty about a lost cat');
   await page.getByRole('button', { name: 'Make song' }).click();
 
   // Submit, then the fake callback, the sync, and the next 3 s read.
