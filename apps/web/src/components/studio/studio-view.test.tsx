@@ -1,0 +1,88 @@
+import type { ConnectionDto, GenerationDto, GenerationStatus, ProviderInfo } from '@minstrel/shared';
+import { screen, within } from '@testing-library/react';
+import { PlayerProvider } from '@/components/player/player-context';
+import { fakeApi, renderWithQuery } from '@/test/render';
+import { StudioView } from './studio-view';
+
+const kie: ProviderInfo = {
+  adapter: 'kie',
+  kind: 'music',
+  displayName: 'kie.ai',
+  defaultBaseUrl: 'https://api.kie.ai',
+  keyUrl: 'https://kie.ai/api-key',
+  capabilities: { lyrics: true, style: true, providerTitle: true, instrumental: true, lengthSeconds: null, tracksPerRequest: 2 },
+};
+
+const connection: ConnectionDto = {
+  id: 'c-kie',
+  kind: 'music',
+  adapter: 'kie',
+  label: 'kie.ai',
+  baseUrl: 'https://api.kie.ai',
+  keyLast4: '4321',
+  defaultModel: null,
+  status: 'ok',
+  lastCheckedAt: null,
+  createdAt: '2026-10-17T10:00:00.000Z',
+};
+
+const generation = (id: string, status: GenerationStatus, idea: string): GenerationDto => ({
+  id,
+  connectionId: 'c-kie',
+  adapter: 'kie',
+  flow: 'job',
+  status,
+  input: { idea, instrumental: false, model: 'V6' },
+  error: null,
+  tracks: [],
+  createdAt: '2026-10-17T10:00:00.000Z',
+  updatedAt: '2026-10-17T10:00:00.000Z',
+});
+
+function renderStudio(recent: GenerationDto[]) {
+  const api = fakeApi({
+    'GET /api/connections': [connection],
+    'GET /api/providers': [kie],
+    'GET /api/connections/c-kie/models': [],
+    'GET /api/generations': { items: recent, nextCursor: null },
+    ...Object.fromEntries(recent.map((g) => [`GET /api/generations/${g.id}`, g])),
+  });
+  renderWithQuery(
+    <PlayerProvider>
+      <StudioView />
+    </PlayerProvider>,
+  );
+  return api;
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+describe('StudioView', () => {
+  it('after a reload the Takes panel shows a song in progress', async () => {
+    renderStudio([generation('g-1', 'pending', 'a sea shanty about a lost cat')]);
+    const takes = await screen.findByRole('region', { name: 'Takes' });
+    expect(await within(takes).findByRole('article', { name: 'a sea shanty about a lost cat' })).toBeInTheDocument();
+  });
+
+  it('the Takes panel shows each song in progress and only the 3 newest finished songs', async () => {
+    renderStudio([
+      generation('g-1', 'complete', 'song one'),
+      generation('g-2', 'pending', 'song two'),
+      generation('g-3', 'failed', 'song three'),
+      generation('g-4', 'complete', 'song four'),
+      generation('g-5', 'complete', 'song five'),
+      generation('g-6', 'running', 'song six'),
+    ]);
+    const takes = await screen.findByRole('region', { name: 'Takes' });
+    await within(takes).findByRole('article', { name: 'song one' });
+    expect(within(takes).getAllByRole('article').map((a) => a.getAttribute('aria-label'))).toEqual([
+      'song one',
+      'song two',
+      'song three',
+      'song four',
+      'song six',
+    ]);
+  });
+});

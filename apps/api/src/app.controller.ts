@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { AllowAnonymous } from '@thallesp/nestjs-better-auth';
 import type { HealthResponse } from '@minstrel/shared';
 import { AppService } from './app.service.js';
 
@@ -6,12 +7,8 @@ import { AppService } from './app.service.js';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
-  @Get()
-  getHello(): string {
-    return this.appService.getHello();
-  }
-
   @Get('health')
+  @AllowAnonymous()
   getHealth(): HealthResponse {
     return this.appService.getHealth();
   }
