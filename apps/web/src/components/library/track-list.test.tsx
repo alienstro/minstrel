@@ -45,13 +45,13 @@ afterEach(() => {
 });
 
 describe('TrackList', () => {
-  it('rows are newest first with title, style, duration, and date', async () => {
+  it('rows are newest first with title, date, style, and duration', async () => {
     fakeApi({ 'GET /api/tracks': page });
     renderList();
 
     const [first, second] = await rows();
-    expect(first).toHaveTextContent(/The Cat Who Sailed.*shanty, accordion.*2:41.*16 Oct/);
-    expect(second).toHaveTextContent(/Lantern Over Dunmoor.*folk, harp, female.*3:15.*15 Oct/);
+    expect(first).toHaveTextContent(/The Cat Who Sailed.*16 Oct.*shanty, accordion.*2:41/);
+    expect(second).toHaveTextContent(/Lantern Over Dunmoor.*15 Oct.*folk, harp, female.*3:15/);
     expect(within(first!).getByRole('link', { name: 'Download The Cat Who Sailed' })).toHaveAttribute(
       'href',
       '/api/tracks/t-2/download',
@@ -123,5 +123,19 @@ describe('TrackList', () => {
 
     expect(await screen.findByText(/Your songs appear here/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Make a song' })).toHaveAttribute('href', '/studio');
+  });
+
+  it('Find shows only the songs whose title or style has the word', async () => {
+    fakeApi({ 'GET /api/tracks': page });
+    renderList();
+    await rows();
+
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Find a song' }), 'HARP');
+    expect(await rows()).toHaveLength(1);
+    expect(screen.queryByText('The Cat Who Sailed')).toBeNull();
+
+    await userEvent.clear(screen.getByRole('searchbox', { name: 'Find a song' }));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Find a song' }), 'polka');
+    expect(screen.getByText('Nothing here.')).toBeInTheDocument();
   });
 });
