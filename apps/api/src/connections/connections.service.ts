@@ -9,6 +9,7 @@ import {
 } from '@minstrel/shared';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { ApiError, notFound } from '../common/api-error.js';
+import { isUuid } from '../common/is-uuid.js';
 import { KeyVault } from '../crypto/key-vault.js';
 import { DB, type Db } from '../db/db.module.js';
 import { providerConnections } from '../db/schema.js';
@@ -119,6 +120,7 @@ export class ConnectionsService {
   }
 
   async remove(userId: string, id: string): Promise<void> {
+    if (!isUuid(id)) throw notFound();
     const deleted = await this.db
       .delete(providerConnections)
       .where(owned(userId, id))
@@ -216,9 +218,6 @@ const aad = (userId: string, connectionId: string) =>
 
 const owned = (userId: string, id: string) =>
   and(eq(providerConnections.id, id), eq(providerConnections.userId, userId));
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const isUuid = (value: string) => UUID.test(value);
 
 function toDto(row: Row): ConnectionDto {
   return {

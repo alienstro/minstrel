@@ -58,6 +58,16 @@ describe('connections routes (e2e)', () => {
     expect(replies[0]!.body.code).toBe('unauthorized');
   });
 
+  it('an ID that is not a UUID gives 404 on PATCH and DELETE', async () => {
+    const api = as(t, ada);
+    const replies = [
+      await api.patch('/api/connections/abc', { label: 'x' }),
+      await api.delete('/api/connections/abc'),
+    ];
+    expect(replies.map((r) => r.status)).toEqual([404, 404]);
+    expect(replies.map((r) => r.body.code)).toEqual(['not_found', 'not_found']);
+  });
+
   it('GET /api/providers lists the music adapters', async () => {
     const res = await as(t, ada).get('/api/providers');
     expect(res.status).toBe(200);
