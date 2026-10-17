@@ -58,7 +58,6 @@ export function HomeHero() {
           <span className="home-cover" role="img" aria-label={`Sample cover art for ${cover.song}`} style={photoStyle(cover.img)} />
         </div>
         <div className="home-fu flex flex-col items-center gap-0.5 text-center" style={delay(0.4)} aria-live="polite">
-          <span className="mu text-[13px]">Sample cover · photo by {cover.creator}</span>
           <span className="text-[15px] font-medium">{cover.song}</span>
         </div>
         <div className="home-mp home-fu" role="group" aria-label="Cover controls" style={delay(0.5)}>
