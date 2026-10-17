@@ -5,3 +5,4 @@ export interface HealthResponse {
 }
 
 export * from './adapters.js';
+export * from './generation-input.js';
