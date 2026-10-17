@@ -78,6 +78,12 @@ describe('SongForm', () => {
     expect(screen.getByRole('slider', { name: /length/i })).toBeDisabled();
   });
 
+  it('with Auto on, the hint says that a song can be longer than the slider maximum', async () => {
+    renderForm();
+    await pickModel('V6');
+    expect(screen.getByText('kie.ai picks the length. A song can be longer than 6:00. Turn off Auto to choose it.')).toBeInTheDocument();
+  });
+
   it('with Auto off and lyrics, a kie request sends the chosen length', async () => {
     const api = fakeApi({ 'POST /api/generations': generation });
     renderForm();

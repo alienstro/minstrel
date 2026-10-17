@@ -225,7 +225,8 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
           </div>
           <p className="hint">
             {lengthAutoOn
-              ? 'The model picks the length. Turn off Auto to choose it.'
+              ? // With no length, the provider does not limit the song to range.max (issue #7).
+                `${providerName} picks the length. A song can be longer than ${formatSeconds(range.max)}. Turn off Auto to choose it.`
               : !lengthFits
                 ? `${providerName} keeps the length only when the song has lyrics, or is an instrumental with a style.`
                 : `From ${formatSeconds(range.min)} to ${formatSeconds(range.max)}.`}
