@@ -1,5 +1,5 @@
 import type { GenerationDto, GenerationStatus } from '@minstrel/shared';
-import { useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery } from '@tanstack/react-query';
 import { apiFetch } from '@/lib/api';
 
 // Spec §5.5: the Studio page reads the generation every 3 s until it ends. Each read can start a
@@ -10,8 +10,9 @@ export const isFinished = (status: GenerationStatus) => status === 'complete' ||
 
 export const generationQueryKey = (id: string) => ['generation', id] as const;
 
-export function useGeneration(id: string, initial?: GenerationDto) {
-  return useQuery({
+// One definition for each reader of a generation, so all readers share one cache entry and one poll.
+export function generationQueryOptions(id: string, initial?: GenerationDto) {
+  return queryOptions({
     queryKey: generationQueryKey(id),
     queryFn: () => apiFetch<GenerationDto>(`/api/generations/${id}`),
     initialData: initial,
@@ -22,4 +23,8 @@ export function useGeneration(id: string, initial?: GenerationDto) {
       return status && isFinished(status) ? false : POLL_MS;
     },
   });
+}
+
+export function useGeneration(id: string, initial?: GenerationDto) {
+  return useQuery(generationQueryOptions(id, initial));
 }
