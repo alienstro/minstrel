@@ -36,7 +36,7 @@ Set each variable for Production and Preview. No secret uses the `NEXT_PUBLIC_` 
 | `BETTER_AUTH_SECRET` | 32 or more random bytes |
 | `KEY_ENCRYPTION_KEYS` | `1:<base64 of 32 random bytes>` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From the Google Cloud console |
-| `RESEND_API_KEY`, `EMAIL_FROM` | From Resend, with a verified sending domain |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | An SMTP account. For Gmail: `smtp.gmail.com`, `465`, the Gmail address, an app password, and `Minstrel <the Gmail address>` |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | From Cloudflare R2 |
 
 > **Warning:** Do not set `MINSTREL_FAKE_PROVIDERS` on Vercel. It is for the local end-to-end test only.

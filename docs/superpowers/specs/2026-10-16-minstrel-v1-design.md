@@ -147,7 +147,7 @@ so no secret uses that prefix.
 | `BETTER_AUTH_SECRET` | Better Auth signing secret, 32+ random bytes |
 | `KEY_ENCRYPTION_KEYS` | Master keys for provider keys, for example `1:<base64 32 bytes>`. The highest version encrypts. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in |
-| `RESEND_API_KEY`, `EMAIL_FROM` | Email for verification and password reset |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` | Email for verification and password reset |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Audio storage |
 
 ## 3. Architecture
@@ -248,7 +248,7 @@ To support a new provider, add one class and one registry entry.
 | R2 | `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `@aws-sdk/s3-request-presigner` |
 | Logs | `nestjs-pino` with key redaction |
 | Web data | `@tanstack/react-query` |
-| Email | `resend` |
+| Email | `nodemailer` (SMTP) |
 
 ## 4. Data model
 
@@ -503,7 +503,7 @@ direct track has no provider URL and no cover image. The UI shows a generated pa
   browser reaches auth on the same origin, through the `api` service. The Google OAuth redirect URI is therefore
   `https://minstrel.<name>.to/api/auth/callback/google`.
 - Sign-in methods: email + password with email verification, and Google.
-- Resend sends the verification and password reset emails.
+- An SMTP server (Gmail for v1) sends the verification and password reset emails.
 - The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and host-only.
 - The module guard protects every route. Only `/api/auth/*`, `/api/health`, `/api/webhooks/*`, and
   `/api/cron/sweep` skip the session check. The webhook route checks its token, and the sweep route checks
