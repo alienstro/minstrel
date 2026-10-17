@@ -112,11 +112,7 @@ export class KieMusicProvider implements MusicProvider {
     conn: DecryptedConnection,
     taskId: string,
   ): Promise<MusicTaskResult> {
-    const record = await callEnvelope<KieRecord>(
-      this.fetch,
-      conn,
-      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
-    );
+    const record = await this.record(conn, taskId);
     if (record.state === 'fail') {
       return {
         state: 'failed',
@@ -139,18 +135,14 @@ export class KieMusicProvider implements MusicProvider {
         method: 'POST',
         body: {
           model: 'ai-music-api/generate-lyrics',
-          input: { prompt: prompt.trim().slice(0, LYRICS_PROMPT_MAX) },
+          input: { prompt: cutPrompt(prompt) },
         },
       },
     );
     const deadline = this.now() + LYRICS_TIMEOUT_MS;
     while (this.now() + LYRICS_POLL_MS <= deadline) {
       await this.sleep(LYRICS_POLL_MS);
-      const record = await callEnvelope<KieRecord>(
-        this.fetch,
-        conn,
-        `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
-      );
+      const record = await this.record(conn, taskId);
       if (record.state === 'fail') throw lyricsFailed(conn, record.failMsg);
       if (record.state !== 'success') continue;
       const versions = lyricsOf(record);
@@ -164,6 +156,19 @@ export class KieMusicProvider implements MusicProvider {
       `${conn.label} did not finish the lyrics in time. Try again.`,
     );
   }
+
+  private record(conn: DecryptedConnection, taskId: string): Promise<KieRecord> {
+    return callEnvelope<KieRecord>(
+      this.fetch,
+      conn,
+      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
+    );
+  }
+}
+
+// The cut must not split an emoji or another character that uses two UTF-16 units.
+function cutPrompt(prompt: string): string {
+  return prompt.trim().slice(0, LYRICS_PROMPT_MAX).replace(/[\uD800-\uDBFF]$/, '');
 }
 
 function lyricsFailed(conn: DecryptedConnection, reason?: string | null): ApiError {

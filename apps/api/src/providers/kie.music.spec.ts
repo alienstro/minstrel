@@ -286,6 +286,16 @@ describe('KieMusicProvider.writeLyrics', () => {
     expect(calls[0]!.body.input.prompt).toBe('a'.repeat(200));
   });
 
+  it('writeLyrics does not split an emoji at the cut', async () => {
+    const { fetch, calls } = fakeFetch(
+      json(createOk),
+      json(lyricsRecord('success', [{ text: 'Words', status: 'complete' }])),
+    );
+    const time = fakeTime();
+    await new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, `${'a'.repeat(199)}🎵`);
+    expect(calls[0]!.body.input.prompt).toBe('a'.repeat(199));
+  });
+
   it('writeLyrics fails when no version is complete', async () => {
     const { fetch } = fakeFetch(
       json(createOk),

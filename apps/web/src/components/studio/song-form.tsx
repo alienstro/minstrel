@@ -27,6 +27,9 @@ interface Props {
 type Task = AssistBody['task'];
 type Errors = Record<string, string>;
 
+// The error keys that the form shows next to a field.
+const SHOWN_FIELDS = new Set(['idea', 'model', 'helperModel', 'lyrics', 'style', 'title']);
+
 const DEFAULT_LENGTH = 150;
 const LENGTH_STEP = 5;
 
@@ -379,7 +382,9 @@ function toErrors(error: unknown): Errors {
   if (error instanceof ApiClientError) {
     if (!error.fields) return { form: error.message };
     // The API names input fields with or without the "input." prefix.
-    return Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k.replace(/^input\./, ''), v]));
+    const errors: Errors = Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k.replace(/^input\./, ''), v]));
+    // The form has no place for some fields, for example connectionId. Then it shows the message at the end.
+    return Object.keys(errors).some((k) => SHOWN_FIELDS.has(k)) ? errors : { ...errors, form: error.message };
   }
   return { form: 'Minstrel could not send the request. Try again.' };
 }

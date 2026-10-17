@@ -195,6 +195,21 @@ describe('SongForm', () => {
       expect(screen.queryByRole('button', { name: /^helper model/i })).toBeNull();
     });
 
+    it('an error on a field that the form does not show appears as the form error', async () => {
+      const message = 'Write lyrics needs a text provider key, for example OpenRouter.';
+      const body = { code: 'invalid_input', message, fields: { connectionId: message } };
+      fakeApi({
+        'POST /api/assist': () => {
+          throw new Response(JSON.stringify(body), { status: 400, headers: { 'content-type': 'application/json' } });
+        },
+      });
+      renderMusicOnly();
+      await pickModel('V6');
+      await userEvent.type(screen.getByLabelText('What is the song about?'), 'rain');
+      await userEvent.click(screen.getByRole('button', { name: 'Write lyrics' }));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+    });
+
     it('without a text key, Suggest is disabled', async () => {
       renderMusicOnly();
       await pickModel('V6');
