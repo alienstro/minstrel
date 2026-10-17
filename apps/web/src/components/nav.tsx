@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Logo } from '@/components/brand/logo';
+import { SettingsTabs } from '@/components/settings-tabs';
 
 const ITEMS = [
   { href: '/studio', label: 'Studio', prefix: '/studio' },
@@ -10,7 +11,8 @@ const ITEMS = [
   { href: '/settings/connections', label: 'Settings', prefix: '/settings' },
 ] as const;
 
-// The canvas header: the links on the left, the name in the middle. A dot marks the current page.
+// The canvas header: the links on the left, the name in the middle, and the settings tabs on the
+// right of a settings page. A dot marks the current page.
 export function Nav() {
   const pathname = usePathname();
   const isCurrent = (prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -28,7 +30,7 @@ export function Nav() {
         <Logo />
         Minstrel
       </Link>
-      <span className="hidden flex-1 sm:block" />
+      {isCurrent('/settings') ? <SettingsTabs /> : <span className="hidden flex-1 sm:block" />}
     </header>
   );
 }
