@@ -123,6 +123,23 @@ describe('KieMusicProvider', () => {
     });
   });
 
+  it('a length goes out as duration in custom mode only, as kie.ai allows', async () => {
+    const { fetch, calls } = fakeFetch(json(createOk), json(createOk));
+    const provider = new KieMusicProvider(fetch);
+    await provider.submit(conn, { ...input, lengthSeconds: 120 });
+    await provider.submit(conn, {
+      idea: 'a sea shanty',
+      instrumental: false,
+      model: 'V6',
+      lengthSeconds: 120,
+    });
+    expect(calls[0]!.body.input).toMatchObject({
+      custom_mode: true,
+      duration: 120,
+    });
+    expect(calls[1]!.body.input).not.toHaveProperty('duration');
+  });
+
   it('instrumental sends no lyrics', async () => {
     const { fetch, calls } = fakeFetch(json(createOk));
     await new KieMusicProvider(fetch).submit(conn, {
