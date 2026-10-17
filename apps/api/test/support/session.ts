@@ -6,22 +6,18 @@ export interface SignedIn {
   userId: string;
 }
 
-// Signs up, opens the verification link, and returns the session cookie that Better Auth sets.
+// Signs up with a password, which only fake mode allows, and returns the session cookie that Better
+// Auth sets.
 export async function signIn(
   t: TestApp,
   email = 'ada@example.com',
 ): Promise<SignedIn> {
-  const server = t.app.getHttpServer();
-  const signUp = await request(server)
+  const signUp = await request(t.app.getHttpServer())
     .post('/api/auth/sign-up/email')
     .set('Origin', TEST_ORIGIN)
     .send({ email, password: 'correct horse battery', name: 'Ada' });
   const userId: string = signUp.body.user.id;
-  const link = new URL(
-    t.mailer.verifications.findLast((m) => m.to === email)!.url,
-  );
-  const verified = await request(server).get(link.pathname + link.search);
-  const cookies = ([] as string[]).concat(verified.headers['set-cookie'] ?? []);
+  const cookies = ([] as string[]).concat(signUp.headers['set-cookie'] ?? []);
   const cookie = cookies.map((c) => c.split(';')[0]).join('; ');
   return { cookie, userId };
 }

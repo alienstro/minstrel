@@ -2,11 +2,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { createAuth } from './src/auth/auth.js';
 
-const noMail = {
-  sendVerification: async () => {},
-  sendPasswordReset: async () => {},
-};
-
 // The CLI only reads the schema. It never deletes a user, so the store does nothing.
 const noAudio = {
   put: async () => {},
@@ -20,7 +15,8 @@ export const auth = createAuth(
   {
     WEB_ORIGIN: 'http://localhost:3000',
     BETTER_AUTH_SECRET: 'cli-only-secret-cli-only-secret-00',
+    // The account table keeps its password column for fake mode.
+    passwordSignIn: true,
   },
-  noMail,
   noAudio,
 );
