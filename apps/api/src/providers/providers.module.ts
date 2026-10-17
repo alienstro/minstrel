@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { KieMusicProvider } from './kie.music.js';
 import { OpenAiCompatibleTextProvider } from './openai-compatible.text.js';
 import { ProvidersController } from './providers.controller.js';
 import {
@@ -12,7 +13,7 @@ import type { MusicProvider, TextProvider } from './types.js';
 @Module({
   controllers: [ProvidersController],
   providers: [
-    { provide: MUSIC_PROVIDERS, useFactory: (): MusicProvider[] => [] },
+    { provide: MUSIC_PROVIDERS, useFactory: (): MusicProvider[] => [new KieMusicProvider()] },
     {
       provide: TEXT_PROVIDER,
       useFactory: (): TextProvider => new OpenAiCompatibleTextProvider(),
