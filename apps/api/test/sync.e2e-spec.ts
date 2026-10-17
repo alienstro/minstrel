@@ -202,6 +202,21 @@ describe('SyncService (e2e)', () => {
     expect(seconds).toBeLessThanOrEqual(300);
   });
 
+  it('a provider 401 on the poll gives invalid_key at once', async () => {
+    getTask.mockRejectedValue(mapProviderError(401, '', 'kie.ai'));
+    const id = await insertGeneration();
+
+    await sync.sync(id);
+
+    expect(await generation(id)).toMatchObject({
+      status: 'failed',
+      errorCode: 'invalid_key',
+      errorMessage: 'kie.ai did not accept this key. Check the key in Settings → Connections.',
+      nextPollAt: null,
+      leaseUntil: null,
+    });
+  });
+
   it('a failed task keeps the provider reason in the message', async () => {
     getTask.mockResolvedValue({ state: 'failed', tracks: [], reason: 'the model is busy.' });
     const id = await insertGeneration();

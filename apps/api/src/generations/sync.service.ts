@@ -65,8 +65,13 @@ export class SyncService {
     let result: MusicTaskResult | null = null;
     try {
       result = await provider.getTask(conn, row.providerTaskId);
-    } catch {
-      // A provider error is a missed poll. The backoff and the 30-minute limit decide what comes next.
+    } catch (error) {
+      // Spec §8: a key that the provider refuses does not start to work again, so the song fails now.
+      if (error instanceof ApiError && error.code === 'invalid_key') {
+        await this.fail(row.id, { code: error.code, message: error.message });
+        return;
+      }
+      // Any other provider error is a missed poll. The backoff and the 30-minute limit decide what comes next.
     }
 
     // The lease ends SYNC_LEASE_SECONDS after the claim, so this is the database time of the claim.
