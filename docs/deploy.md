@@ -78,11 +78,3 @@ The Vercel docs do not state these items for services. Check each one and write 
    - A Suno-compatible service: the song completes, and both takes play from R2.
    - ElevenLabs: a 180 s song finishes in less than 240 s. Write the measured time here.
 3. **Account deletion.** Delete a test account. Its objects under `users/<userId>/` in R2 must be gone.
-
-## 9. Open decision for the owner
-
-The direct-flow runner does not start the next queued ElevenLabs song at the end of a call, which is a
-change from spec §5.4 step 2.8. A function stops at 300 s, and `waitUntil` work counts in that time, so a
-second 240 s call in the same function call would stop and become `interrupted` after the user paid. A
-read (the Studio page reads every 3 s) or the daily sweep starts the queued song in a new function call.
-Confirm this change, then update the spec.

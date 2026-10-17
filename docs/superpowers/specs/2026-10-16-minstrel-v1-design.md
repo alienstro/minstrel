@@ -440,14 +440,17 @@ last R2 write and the database update.
    5. The response body streams straight into R2 (§5.5). It never sits in memory as one buffer.
    6. On success: one transaction inserts the track with `storage_status = stored` and sets `complete`.
    7. On failure: the API sets `failed` with a mapped error (§8).
-   8. At the end, success or failure, `startDirect` runs again for the user's oldest `queued` generation.
+   8. At the end, `startDirect` does not start the next `queued` generation. `waitUntil` work counts in
+      the 300 s function limit, so a second call in the same function call would stop and become
+      `interrupted` after the user paid. Step 4 starts the next generation in a new function call.
 3. **No automatic retry.** Each direct call costs the user money. When a read or the daily sweep finds a
    `running` generation with an expired lease (for example, after Vercel stopped the instance), it sets
    `failed` with `interrupted`. It never calls the provider again. The user can press "Make song" again.
-4. **Queue limit.** Each user has at most 4 direct calls in `running`. Step 2.8 starts the next `queued`
-   generation. A read and the daily sweep also pass `startDirect` to `waitUntil` for `queued`
-   generations, in creation order. A `queued` row costs nothing, so Minstrel can start it safely at any
-   time.
+4. **Queue limit.** Each user has at most 4 direct calls in `running`. A read of a `queued` or `running`
+   direct generation (the Studio page reads every 3 s) and the daily sweep pass `startDirect` to
+   `waitUntil` for the user's `queued` generations, in creation order. The sweep starts direct calls only
+   in its first 30 s, so each call ends before the 300 s limit. A `queued` row costs nothing, so Minstrel
+   can start it safely at any time.
 
 ### 5.5 Live status and copy to R2
 
