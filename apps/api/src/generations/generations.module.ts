@@ -6,10 +6,11 @@ import { GenerationsRepo } from './generations.repo.js';
 import { GenerationsService } from './generations.service.js';
 import { SyncService } from './sync.service.js';
 import { TrackCopier } from './track-copier.js';
+import { WebhookController } from './webhook.controller.js';
 
 @Module({
   imports: [ConnectionsModule],
-  controllers: [GenerationsController],
+  controllers: [GenerationsController, WebhookController],
   providers: [
     GenerationsRepo,
     GenerationsService,

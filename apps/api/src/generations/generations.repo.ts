@@ -27,6 +27,17 @@ export class GenerationsRepo {
     return row ?? null;
   }
 
+  /** The adapter and the callback token hash of a generation, for the webhook check. */
+  async callbackTarget(
+    id: string,
+  ): Promise<{ adapter: string; callbackTokenHash: Buffer | null } | null> {
+    const [row] = await this.db
+      .select({ adapter: generations.adapter, callbackTokenHash: generations.callbackTokenHash })
+      .from(generations)
+      .where(eq(generations.id, id));
+    return row ?? null;
+  }
+
   /** Job generations that wait for a poll, the oldest poll time first. */
   dueJobGenerations(limit: number, userId?: string): Promise<GenerationRow[]> {
     return this.db

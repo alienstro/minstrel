@@ -1,3 +1,4 @@
+import type { IncomingMessage } from 'node:http';
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
@@ -29,6 +30,17 @@ const mailerProvider = {
     ),
 };
 
+// The webhook route ignores its body (spec §5.3), so the parsers skip it. A bad or large provider
+// body then cannot turn a good callback into a 400 or a 413.
+function parseUnlessWebhook(mediaType: string) {
+  return (req: IncomingMessage & { originalUrl?: string }): boolean => {
+    // Express middleware can strip its mount path from req.url. originalUrl keeps the full path.
+    if ((req.originalUrl ?? req.url ?? '').startsWith('/api/webhooks/')) return false;
+    const type = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+    return type === mediaType;
+  };
+}
+
 @Module({
   providers: [mailerProvider],
   exports: [MAILER],
@@ -59,6 +71,10 @@ class MailerModule {}
       inject: [DB, MAILER],
       useFactory: (db: Db, mailer: Mailer) => ({
         auth: createAuth(db, authEnvFromProcess(), mailer),
+        bodyParser: {
+          json: { type: parseUnlessWebhook('application/json') },
+          urlencoded: { type: parseUnlessWebhook('application/x-www-form-urlencoded') },
+        },
       }),
     }),
   ],
