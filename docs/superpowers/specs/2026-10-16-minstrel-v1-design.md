@@ -42,78 +42,113 @@ storage.
 
 - A new user can sign up, add a music provider key, and play a generated song in less than 5 minutes.
 - A song still plays 30 days after generation (kie.ai and sunoapi.org delete their files after 14 days).
-- If the server restarts during a paid direct call (ElevenLabs), the API does not repeat the call.
+- If the function instance stops during a paid direct call (ElevenLabs), the API does not repeat the call.
 - No API path returns a stored provider key, and no log line contains one.
-- A lost provider callback, or a provider without callbacks, does not leave a generation stuck. The fallback poll completes it or marks it
-  failed within 30 minutes.
+- A lost provider callback, or a provider without callbacks, does not leave a generation stuck. While the
+  user has Minstrel open, a sync on read completes it or marks it failed within 30 minutes. Otherwise the
+  user's next visit or the daily sweep does it, within 24 hours (§5.3).
 
 ## 2. Infrastructure
 
-### 2.1 Addresses
+Vercel hosts the web app and the API in one project with Vercel Services (beta). Neon hosts Postgres.
+Cloudflare R2 keeps the audio.
 
-`<name>.to` is the owner's domain. Its DNS must be on Cloudflare.
+### 2.1 Address and plan
 
-| Address | Runs | Host |
+`<name>.to` is the owner's domain. Its DNS stays on Cloudflare.
+
+| Path on `minstrel.<name>.to` | Runs | Vercel service |
 |---|---|---|
-| `minstrel.<name>.to` | Next.js web app | Vercel (Hobby plan) |
-| `minstrel-api.<name>.to` | NestJS API | Self-hosted server `main`, through Cloudflare Tunnel |
+| `/api/*` | NestJS API, one Vercel Function on Fluid compute | `api` (root `apps/api/`) |
+| Each other path | Next.js web app | `web` (root `apps/web/`) |
 
-The API uses a one-level subdomain. Cloudflare Universal SSL does not cover second-level names such as
-`api.minstrel.<name>.to`.
-
-**Note:** the Vercel Hobby plan allows non-commercial use only. Move to Vercel Pro before Minstrel takes
-payments or shows ads.
+- The Cloudflare record for `minstrel` is a CNAME to Vercel with the proxy off (DNS only). Vercel issues
+  the certificate.
+- The project uses the Vercel Hobby plan. Three Hobby limits shape this design:
+  - Vercel Cron runs at most once per day, at a time within the hour (§5.3).
+  - A function stops after 300 s, so a direct call must end before that (§5.4).
+  - Hobby allows non-commercial use only. Move to Pro before Minstrel takes payments or shows ads.
 
 ### 2.2 Request paths
 
 ```
-Browser ──► minstrel.<name>.to/*        Vercel: Next.js pages
-Browser ──► minstrel.<name>.to/api/*    Vercel rewrite ──► minstrel-api.<name>.to/api/*
-Music provider ──► minstrel-api.<name>.to/api/webhooks/<adapter>/*   (only providers with callbacks)
-minstrel-api ──► Cloudflare ══ tunnel ══► cloudflared ──► Traefik (Dokploy) ──► api container ──► postgres
-api container ──► music and text providers (kie.ai, OpenRouter, any other), Cloudflare R2   (outbound)
-Browser ──► R2 signed URL                 audio stream and download
+Browser ──► minstrel.<name>.to/*         Vercel ──► service web (Next.js)
+Browser ──► minstrel.<name>.to/api/*     Vercel ──► service api (NestJS)
+Music provider ──► minstrel.<name>.to/api/webhooks/<adapter>/*   (only providers with callbacks)
+Vercel Cron ──► minstrel.<name>.to/api/cron/sweep                (once per day, production only)
+service api ──► Neon Postgres (pooled connection)
+service api ──► music and text providers (kie.ai, OpenRouter, any other), Cloudflare R2   (outbound)
+Browser ──► R2 signed URL                  audio stream and download
 ```
 
-- The browser uses one origin only. Next.js `rewrites()` sends `/api/*` to the API. CORS is not necessary.
-- The session cookie is host-only on `minstrel.<name>.to`. Other subdomains of `<name>.to` never get it.
+- The browser uses one origin only, so CORS is not necessary. Next.js has no `rewrites()` for the API.
+- The `api` service gets the full path, for example `/api/generations`. NestJS keeps the global prefix `api`.
+- The session cookie is host-only on `minstrel.<name>.to`.
 - Audio does not go through Vercel. The browser gets it from R2 with signed URLs.
 
-### 2.3 Server `main`
+### 2.3 Vercel project
 
-Facts from the read-only check on 2026-10-16: Ubuntu 24.04, 4 CPUs, 12 GB RAM, 158 GB free disk.
-Dokploy v0.30.6 runs with Traefik on ports 80/443 in Docker Swarm. The internet cannot reach the server
-directly (NAT). The owner reaches it through Tailscale.
+`vercel.json` at the repository root:
 
-Minstrel adds these Dokploy services:
-
-| Service | Description |
-|---|---|
-| `minstrel-api` | Dokploy application. Builds `apps/api/Dockerfile` from GitHub on each push to `main`. |
-| `minstrel-db` | Dokploy database service, Postgres 18. Internal network only. Never publish port 5432. |
-| `minstrel-tunnel` | `cloudflared` with one public hostname: `minstrel-api.<name>.to` → Traefik. |
+```json
+{
+  "services": {
+    "web": { "root": "apps/web/" },
+    "api": { "root": "apps/api/", "entrypoint": "src/main.ts" }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "api" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ],
+  "crons": [{ "path": "/api/cron/sweep", "schedule": "0 4 * * *" }]
+}
+```
 
 Rules:
 
-- Do not use `dokploy-postgres` for app data. It belongs to Dokploy.
-- Do not route Dokploy (port 3000), SillyTavern, 9router, or Docker Swarm ports through the tunnel.
-- Dokploy scheduled backups send a nightly `pg_dump` of `minstrel-db` to the R2 bucket `minstrel-backups`.
-  The bucket keeps 14 daily copies. Do one restore test before launch.
+- Fluid compute stays on. It is the default for new projects. On Hobby, the default `maxDuration` is
+  also the maximum, 300 s, so `vercel.json` does not set it.
+- Put the functions and the Neon database in the same region, for example `iad1` and Neon `aws-us-east-1`.
+- Vercel Cron calls the production deployment only. It sends `Authorization: Bearer <CRON_SECRET>`. The cron
+  route is `@AllowAnonymous`, and it compares the token with `crypto.timingSafeEqual`.
+- Deployment Protection blocks provider callbacks to a preview, and Vercel Cron does not call a preview.
+  A job song made on a preview still finishes while the Studio page is open, because of the sync on read
+  (§5.3).
 
-### 2.4 Environment variables (API)
+Check these items at the first preview deploy, because the Vercel docs do not state them for services:
+
+1. A top-level `crons` entry reaches the `api` service through the `/api/(.*)` rewrite.
+2. Both services build `packages/shared` from the pnpm workspace.
+
+### 2.4 Database (Neon)
+
+- Add Neon from the Vercel Marketplace, with Postgres 18. The integration sets `DATABASE_URL` (pooled)
+  and `DATABASE_URL_UNPOOLED` (direct).
+- Turn on the integration option that makes one Neon branch for each preview deployment. A preview
+  migration then never touches production data.
+- The API uses a `pg` `Pool` on `DATABASE_URL`. `attachDatabasePool` from `@vercel/functions` closes idle
+  clients before Vercel suspends an instance.
+- The `api` build command runs `drizzle-kit migrate` with `DATABASE_URL_UNPOOLED`.
+- Neon point-in-time restore replaces the nightly `pg_dump`. The restore window depends on the Neon plan,
+  and the Free plan keeps only a short window. Choose the plan before launch, then do one restore test.
+- Local development uses Postgres 18 in Docker.
+
+### 2.5 Environment variables
+
+The two services share the project's environment variables. Only `NEXT_PUBLIC_*` names reach the browser,
+so no secret uses that prefix.
 
 | Name | Purpose |
 |---|---|
-| `DATABASE_URL` | Connection string for `minstrel-db` |
-| `WEB_ORIGIN` | `https://minstrel.<name>.to`. Better Auth `baseURL` and trusted origin. |
-| `PUBLIC_API_URL` | `https://minstrel-api.<name>.to`. Base of the provider callback URLs. |
+| `DATABASE_URL` | Neon pooled connection string. The Neon integration sets it. |
+| `DATABASE_URL_UNPOOLED` | Neon direct connection string, for migrations only. The Neon integration sets it. |
+| `WEB_ORIGIN` | `https://minstrel.<name>.to`. Better Auth `baseURL`, trusted origin, and base of the provider callback URLs. |
+| `CRON_SECRET` | 32+ random bytes. Vercel Cron sends it as a bearer token. |
 | `BETTER_AUTH_SECRET` | Better Auth signing secret, 32+ random bytes |
 | `KEY_ENCRYPTION_KEYS` | Master keys for provider keys, for example `1:<base64 32 bytes>`. The highest version encrypts. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Email for verification and password reset |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Audio storage |
-
-The web app needs only `API_ORIGIN` (`https://minstrel-api.<name>.to`) for the rewrite.
 
 ## 3. Architecture
 
@@ -122,14 +157,14 @@ The web app needs only `API_ORIGIN` (`https://minstrel-api.<name>.to`) for the r
 | Unit | Location | Job |
 |---|---|---|
 | Shared contracts | `packages/shared` | Zod schemas and TypeScript types for each request and response. Web and API both import them. |
-| Database | `apps/api/src/db` | Drizzle schema, migrations, and the `pg` pool |
+| Database | `apps/api/src/db` | Drizzle schema, migrations, and the `pg` pool with `attachDatabasePool` |
 | Auth | `apps/api/src/auth` | Better Auth instance and `@thallesp/nestjs-better-auth` module with a global guard |
 | Crypto | `apps/api/src/crypto` | `KeyVault`: encrypt and decrypt provider keys |
 | Network guard | `apps/api/src/net` | `safeFetch`: outbound HTTPS with private-address blocks |
 | Providers | `apps/api/src/providers` | `MusicProvider` and `TextProvider` interfaces, `KieMusicProvider`, `SunoClassicMusicProvider`, `ElevenLabsMusicProvider`, `OpenAiCompatibleTextProvider`, and a registry |
 | Connections | `apps/api/src/connections` | CRUD and "test connection" for provider keys |
 | Assist | `apps/api/src/assist` | The lyric and prompt helper |
-| Generations | `apps/api/src/generations` | Submit, webhook, sync, and the fallback poller |
+| Generations | `apps/api/src/generations` | Submit, webhook, sync, sync on read, and the daily sweep route |
 | Storage | `apps/api/src/storage` | `AudioStore` interface and an R2 implementation (S3 API) |
 | Library | `apps/api/src/tracks` | List, rename, delete, stream, and download tracks |
 | Web app | `apps/web` | Pages, the global player, and the API client |
@@ -198,7 +233,7 @@ To support a new provider, add one class and one registry entry.
   of the app (generations, tracks, storage, and UI) does not change.
 - The UI lists the music adapters from the registry, so a new adapter appears in Settings without UI work.
 - The webhook route is `/api/webhooks/:adapter/:generationId`. A job provider without callbacks
-  (`supportsCallback = false`) uses only the poller. A direct provider never uses the webhook.
+  (`supportsCallback = false`) uses only the sync on read and the daily sweep. A direct provider never uses the webhook.
 
 ### 3.3 Libraries
 
@@ -207,8 +242,9 @@ To support a new provider, add one class and one registry entry.
 | ORM and migrations | `drizzle-orm`, `drizzle-kit`, `pg` |
 | Auth | `better-auth`, `@thallesp/nestjs-better-auth`, Drizzle adapter |
 | Validation | `zod` schemas in `packages/shared`, a Zod validation pipe in NestJS |
-| Scheduled jobs | `@nestjs/schedule` |
-| Rate limits | `@nestjs/throttler` |
+| Scheduled jobs | Vercel Cron, which calls `GET /api/cron/sweep` once per day |
+| Work after the reply | `waitUntil` from `@vercel/functions` |
+| Rate limits | `@nestjs/throttler` with a Postgres storage (§7.4), Vercel Firewall rate-limit rules |
 | R2 | `@aws-sdk/client-s3`, `@aws-sdk/lib-storage`, `@aws-sdk/s3-request-presigner` |
 | Logs | `nestjs-pino` with key redaction |
 | Web data | `@tanstack/react-query` |
@@ -220,8 +256,8 @@ PostgreSQL 18 with Drizzle. All IDs are UUID v7. All times are `timestamptz`.
 
 ### 4.1 Auth tables
 
-Better Auth owns `user`, `session`, `account`, and `verification`. Generate their Drizzle schema with the
-Better Auth CLI. Do not edit them by hand.
+Better Auth owns `user`, `session`, `account`, `verification`, and `rateLimit` (§7.4). Generate their
+Drizzle schema with the Better Auth CLI. Do not edit them by hand.
 
 ### 4.2 `provider_connections`
 
@@ -260,7 +296,7 @@ Better Auth CLI. Do not edit them by hand.
 | `lease_until` | timestamptz null | Sync claim (§5.3). Stops two workers from syncing one row. |
 | `created_at`, `updated_at` | timestamptz | |
 
-Index: `(status, next_poll_at)` for the poller. Index: `(user_id, created_at desc)` for the list.
+Index: `(status, next_poll_at)` for the sync on read and the daily sweep. Index: `(user_id, created_at desc)` for the list.
 
 ### 4.4 `tracks`
 
@@ -280,7 +316,17 @@ Index: `(status, next_poll_at)` for the poller. Index: `(user_id, created_at des
 
 Index: `(user_id, created_at desc)`.
 
-### 4.5 Ownership rule
+### 4.5 `rate_limits`
+
+The `@nestjs/throttler` storage (§7.4). It has no user data, so it has no ownership rule.
+
+| Column | Type | Notes |
+|---|---|---|
+| `key` | text PK | Throttler name, route, and user ID |
+| `hits` | int | |
+| `reset_at` | timestamptz | The daily sweep deletes rows where `reset_at < now()`. |
+
+### 4.6 Ownership rule
 
 Each query for a connection, generation, or track filters on `user_id` from the session. A row of another
 user returns `404`, not `403`, so that IDs do not leak.
@@ -308,6 +354,8 @@ user returns `404`, not `403`, so that IDs do not leak.
 Other facts:
 
 - Only paid ElevenLabs plans can use the Music API.
+- ElevenLabs allows 3–600 s, but Minstrel limits ElevenLabs songs to 5–180 s, so that each call ends
+  inside the 300 s function limit (§5.4). The test before launch measures a 180 s song (§11).
 - The kie.ai webhook HMAC signs `taskId.timestamp` only, not the body. Both Suno providers tell clients to
   read the authoritative result from the status endpoint.
 - Earlier Suno models (`V4` to `V5_5`) are discontinued. Minstrel does not offer them.
@@ -333,57 +381,79 @@ The sync step can skip states. For example, `pending` can go directly to `comple
       SHA-256 hash.
    3. The API inserts the generation with status `submitting`, `flow = job`, and the adapter.
    4. `KeyVault` decrypts the key. `submit()` sends the task with
-      `callBackUrl = ${PUBLIC_API_URL}/api/webhooks/<adapter>/<generationId>?t=<token>`.
-   5. On success: the API saves `provider_task_id`, sets `pending`, and sets `next_poll_at = now + 30 s`.
+      `callBackUrl = ${WEB_ORIGIN}/api/webhooks/<adapter>/<generationId>?t=<token>`.
+   5. On success: the API saves `provider_task_id`, sets `pending`, and sets `next_poll_at = now + 60 s`.
    6. On failure: the API sets `failed` with a mapped error (§8).
    7. The response is the generation, with `202 Accepted`.
 2. **Callback.** `POST /api/webhooks/:adapter/:generationId?t=<token>` is public (`@AllowAnonymous`).
    1. The API compares the token hash with `crypto.timingSafeEqual`. A mismatch, an unknown ID, or an
       adapter that does not match the row returns `404`.
    2. The API ignores the request body.
-   3. The API replies `200` at once, then runs `sync(generationId)` in the background.
+   3. The API replies `200` at once and passes `sync(generationId)` to `waitUntil`. The function instance
+      stays alive until the sync ends.
 3. **Sync.** `sync(generationId)` first claims the row with one statement:
    `UPDATE generations SET lease_until = now() + interval '90 seconds' WHERE id = $1 AND
    (lease_until IS NULL OR lease_until < now()) RETURNING *`. When no row returns, another worker has the
-   claim, and this call stops. A callback and the poller can never sync the same row at the same time.
+   claim, and this call stops. A callback, a read, and the daily sweep can never sync the same row at the same time.
    The provider call happens outside any database transaction, so a slow provider never holds a lock.
    1. When the connection no longer exists, the generation goes to `failed` with `connection_removed`.
    2. `getTask()` reads the status endpoint with the user's key.
    3. In one short transaction, the API saves the mapped state, upserts each returned track on
       `(generation_id, provider_track_id)`, and clears `lease_until`.
    4. Each new track starts the copy to R2 (§5.5).
-4. **Fallback poller.** `@nestjs/schedule` runs every 30 seconds. It selects up to 20 job generations in
-   `pending`, `text_ready`, or `first_ready` where `next_poll_at <= now()`, and syncs each one.
-   - Backoff: 30 s, 60 s, 120 s, then 300 s.
-   - After 30 minutes from submit, the generation goes to `failed` with `provider_timeout`.
-   - The same job retries tracks in `pending` or `copy_failed` with fewer than 5 attempts.
+4. **Sync on read.** Vercel Cron runs only once per day on Hobby (§2.1), so reads drive the fallback poll.
+   A job generation is due when it is in `pending`, `text_ready`, or `first_ready` and
+   `next_poll_at <= now()`.
+   - `GET /api/generations/:id` passes `sync(generationId)` to `waitUntil` when the generation is due,
+     then returns the row at once. The Studio page reads it every 3 seconds (§5.5).
+   - `GET /api/generations` (the Library and the "Takes" panel) does the same for up to 5 of the user's
+     due generations.
+   - The lease in step 3 stops a double sync when two reads come at the same time.
+   - Backoff: 60 s, 120 s, then 300 s.
+   - After 30 minutes from submit, a read or the daily sweep sets `failed` with `provider_timeout`.
+5. **Daily sweep.** Vercel Cron calls `GET /api/cron/sweep` once per day (§2.3). The route stops new work
+   after 240 s, and the next sweep continues it. In this order, it:
+   1. Syncs each due job generation, at most 5 at a time.
+   2. Retries tracks in `pending` or `copy_failed` with fewer than 5 attempts.
+   3. Does the work of §5.4 steps 3 and 4.
+   4. Deletes old `rate_limits` rows (§4.5).
 
 ### 5.4 Direct flow (`elevenlabs`)
 
-A direct call can take minutes, and the Vercel rewrite must not wait for it. The API runs it in the
-background.
+A direct call can take minutes, so the browser must not wait for it. The API runs the call with
+`waitUntil` after the reply. On Hobby, a function stops after 300 s (§2.1). So Minstrel limits ElevenLabs
+songs to 5–180 s, and the abort in step 2 stops the call after 240 s. The 60 s left over is for the
+last R2 write and the database update.
 
 1. **Submit.** `POST /api/generations` checks the input, inserts the generation with status `queued` and
-   `flow = direct`, and returns `202 Accepted` at once. Then it starts `runDirect(generationId)` in the
-   background.
-2. **Run.** `runDirect` claims the row with the same lease statement as §5.3, with a lease of 15 minutes,
-   and sets `running`.
-   1. `compose()` calls the provider with an `AbortSignal` that stops the call after 12 minutes.
-   2. The response body streams straight into R2 (§5.5). It never sits in memory as one buffer.
-   3. On success: one transaction inserts the track with `storage_status = stored` and sets `complete`.
-   4. On failure: the API sets `failed` with a mapped error (§8).
-3. **No automatic retry.** Each direct call costs the user money. When the poller finds a `running`
-   generation with an expired lease (for example, after a server restart), it sets `failed` with
-   `interrupted`. It never calls the provider again. The user can press "Make song" again.
-4. **Queue limit.** Each API process runs at most 4 direct calls at once. The poller starts `queued`
-   generations in creation order when a place is free. A `queued` row costs nothing, so the poller can
-   start it safely after a restart.
+   `flow = direct`, and returns `202 Accepted` at once. Then it passes `startDirect(generationId)` to
+   `waitUntil`.
+2. **Start and run.** `startDirect` claims the row in one short transaction:
+   1. It takes `pg_advisory_xact_lock` on the user ID, so two starts for one user never count at the
+      same time.
+   2. It counts the user's direct generations in `running`. When the count is 4 or more, the row stays
+      `queued`, and `startDirect` stops.
+   3. Otherwise it sets `running` and a lease of 6 minutes, with the lease statement of §5.3. The lease is
+      longer than the 300 s limit, so a live call never looks stopped.
+   4. After the commit, `compose()` calls the provider with an `AbortSignal` that stops the call after
+      240 s.
+   5. The response body streams straight into R2 (§5.5). It never sits in memory as one buffer.
+   6. On success: one transaction inserts the track with `storage_status = stored` and sets `complete`.
+   7. On failure: the API sets `failed` with a mapped error (§8).
+   8. At the end, success or failure, `startDirect` runs again for the user's oldest `queued` generation.
+3. **No automatic retry.** Each direct call costs the user money. When a read or the daily sweep finds a
+   `running` generation with an expired lease (for example, after Vercel stopped the instance), it sets
+   `failed` with `interrupted`. It never calls the provider again. The user can press "Make song" again.
+4. **Queue limit.** Each user has at most 4 direct calls in `running`. Step 2.8 starts the next `queued`
+   generation. A read and the daily sweep also pass `startDirect` to `waitUntil` for `queued`
+   generations, in creation order. A `queued` row costs nothing, so Minstrel can start it safely at any
+   time.
 
 ### 5.5 Live status and copy to R2
 
 **Live status.** The Studio page polls `GET /api/generations/:id` every 3 seconds while the status is not
-`complete` or `failed`. Polling works through the Vercel rewrite. Server-sent events may get buffered there,
-so v1 does not use them.
+`complete` or `failed`. A server-sent events stream keeps a function instance open and stops at
+`maxDuration`, so v1 does not use them.
 
 **Copy to R2 (job flow).**
 
@@ -394,7 +464,7 @@ so v1 does not use them.
    type must start with `image/`.
 3. The size limit is 50 MB for audio and 5 MB for a cover. The copy stops when a file is larger.
 4. On success: `storage_status = stored`, and the provider URLs become null.
-5. On failure: `storage_status = copy_failed`, and `copy_attempts` goes up by one. The poller retries.
+5. On failure: `storage_status = copy_failed`, and `copy_attempts` goes up by one. The daily sweep retries.
 6. Before the copy finishes, the player uses `provider_audio_url` (the provider's stream URL). The user can
    play the first take before the copy is done.
 
@@ -427,13 +497,14 @@ direct track has no provider URL and no cover image. The UI shows a generated pa
 ### 7.2 Auth and sessions
 
 - Better Auth runs inside NestJS. `baseURL` is `WEB_ORIGIN` and `basePath` is `/api/auth`, because the
-  browser reaches auth through the Vercel rewrite. The Google OAuth redirect URI is therefore
+  browser reaches auth on the same origin, through the `api` service. The Google OAuth redirect URI is therefore
   `https://minstrel.<name>.to/api/auth/callback/google`.
 - Sign-in methods: email + password with email verification, and Google.
 - Resend sends the verification and password reset emails.
 - The cookie is `HttpOnly`, `Secure`, `SameSite=Lax`, and host-only.
-- The module guard protects every route. Only `/api/auth/*`, `/api/health`, and `/api/webhooks/*` are
-  public.
+- The module guard protects every route. Only `/api/auth/*`, `/api/health`, `/api/webhooks/*`, and
+  `/api/cron/sweep` skip the session check. The webhook route checks its token, and the sweep route checks
+  `CRON_SECRET`.
 - Account deletion uses Better Auth `deleteUser`. A hook first deletes all R2 objects under
   `users/<userId>/`. The database cascades remove the user's rows.
 - The Next.js `proxy.ts` sends a signed-out user to `/sign-in` when no session cookie exists. This check
@@ -441,8 +512,8 @@ direct track has no provider URL and no cover image. The UI shows a generated pa
 
 ### 7.3 Outbound requests (SSRF)
 
-Users control `base_url`, so they also control which audio URLs the API downloads. The API runs next to
-Dokploy and other private services. All outbound calls use `safeFetch`:
+Users control `base_url`, so they also control which audio URLs the API downloads. The API must never
+reach a private or metadata address. All outbound calls use `safeFetch`:
 
 - HTTPS only. Port 443 only.
 - A custom DNS lookup blocks loopback, private (RFC 1918), link-local, CGNAT `100.64.0.0/10` (Tailscale),
@@ -458,11 +529,12 @@ Result: v1 cannot use providers on a private network, for example a local Ollama
 - **CSRF:** Better Auth checks the origin for auth routes. A global guard rejects mutating requests to
   other routes when `Origin` is not `WEB_ORIGIN`. All bodies must be `application/json`.
 - **Rate limits (per user):** 10 generations per minute, 20 assist calls per minute, 30 connection tests
-  per hour. Better Auth applies its own limits to auth routes.
-- **Rate limits (per IP):** 120 requests per minute on the webhook route.
-- **Client IP:** the API trusts forwarded headers from Traefik. A test before launch must confirm that the
-  real client IP arrives through the chain Vercel → Cloudflare → Traefik. Until then, auth rate limits
-  can count Vercel addresses.
+  per hour. Many function instances run at the same time, so a count in memory is not correct.
+  `@nestjs/throttler` uses a `ThrottlerStorage` on the Postgres table `rate_limits` (§4.5). Better Auth uses `rateLimit.storage = "database"` for auth routes.
+- **Rate limits (per IP):** a Vercel Firewall rate-limit rule allows 120 requests per minute on
+  `/api/webhooks/*`.
+- **Client IP:** the API reads the client IP from the `x-real-ip` header that Vercel sets. A test before
+  launch must confirm that Better Auth and the throttler see the real client IP.
 - **Logs:** pino redacts `authorization`, `cookie`, `apiKey`, `key`, and `*.key*` paths. Provider error
   bodies go through the same redaction before the API logs them.
 - **R2:** the bucket is private. Stream URLs are valid for 15 minutes. Download URLs set
@@ -483,7 +555,7 @@ The API returns `{ code, message }`. The UI shows `message` as it is.
 | Task failed (`fail`, `CREATE_TASK_FAILED`, `GENERATE_AUDIO_FAILED`) | `generation_failed` | "<Provider> could not make this song: <provider reason>." |
 | `SENSITIVE_WORD_ERROR` | `content_rejected` | "<Provider> did not accept some words in the lyrics or the style. Change them, then try again." |
 | Poll limit reached | `provider_timeout` | "<Provider> did not finish this song in 30 minutes." |
-| Direct call stopped by a restart | `interrupted` | "The server restarted while <Provider> made this song. Minstrel did not send the request again, so you were not charged twice. Press Make song to try again." |
+| Direct call stopped with its instance | `interrupted` | "Minstrel stopped while <Provider> made this song. Minstrel did not send the request again, so you were not charged twice. Press Make song to try again." |
 | Connection deleted during a generation | `connection_removed` | "You removed the key for this song before it finished. Add a key, then make the song again." |
 | Zod failure | `invalid_input` | The field-level messages |
 | Our rate limit | `rate_limited` | "You sent too many requests. Wait a minute, then try again." |
@@ -512,6 +584,7 @@ Request and response schemas live in `packages/shared`.
 | `GET /api/generations` | List generations, cursor pages of 20 |
 | `GET /api/generations/:id` | One generation and its tracks |
 | `POST /api/webhooks/:adapter/:generationId` | Job-flow music provider callback (public, token). For example, `adapter = kie`. |
+| `GET /api/cron/sweep` | Daily sweep (public, `CRON_SECRET` bearer token, §5.3) |
 | `GET /api/tracks` | Library, cursor pages of 50, newest first |
 | `PATCH /api/tracks/:id` | Rename |
 | `DELETE /api/tracks/:id` | Delete the row and the R2 objects |
@@ -632,8 +705,9 @@ Studio, wide screen. The form is left-aligned. Text never centers, except in the
 ```
 
 The form shows only the fields in the adapter's `capabilities`. For example, ElevenLabs shows a length
-control and keeps the title in Minstrel only. When the user picks a model of a different provider, the values
-in hidden fields stay in the form, so nothing typed is lost.
+slider from 5 to 180 s in 5 s steps (default 150 s), and keeps the title in Minstrel only. When the user
+picks a model of a different provider, the values in hidden fields stay in the form, so nothing typed is
+lost.
 
 The **Model** field is a searchable model picker. It follows the ARIA 1.2 combobox pattern, because a
 provider such as OpenRouter can list hundreds of models, and a plain `<select>` has no search.
@@ -681,7 +755,7 @@ blackletter face. The owner rejected it on 2026-10-17 because the screens looked
 ### 10.3 Quality floor
 
 - The layout works from 360 px wide.
-- Keyboard focus is visible on each control (2 px `--structure` outline, 2 px offset).
+- Keyboard focus is visible on each control (2 px `--ink` outline, 2 px offset).
 - Each icon button has an accessible name.
 - The player responds to the Space key and the arrow keys when it has focus.
 - Error text sits next to its field and uses `aria-describedby`.
@@ -699,26 +773,31 @@ Test limits on the owner's laptop: one test file at a time, `--maxWorkers=1`,
 | Unit | ElevenLabs prompt builder: style, idea, and lyrics order; instrumental sends no lyrics | Vitest |
 | Unit | Generation state transitions and backoff times | Vitest |
 | Unit | Webhook token check: right token, wrong token, unknown ID | Vitest |
+| Unit | Sweep route check: right `CRON_SECRET`, wrong token, no `Authorization` header | Vitest |
+| Unit | ElevenLabs `inputSchema`: 5 s and 180 s pass, 4 s and 185 s fail | Vitest |
 | Unit | Shared Zod schemas: each model limit | Vitest |
 | Integration | Job flow: submit → callback → sync → tracks stored, with a fake `JobMusicProvider` and a fake `AudioStore`, on a real Postgres | Vitest + Docker Postgres |
-| Integration | Direct flow: submit → run → stored; an expired `running` lease becomes `interrupted` and the fake provider gets no second call; the queue limit of 4 | Vitest + Docker Postgres |
+| Integration | Direct flow: submit → run → stored; an expired `running` lease becomes `interrupted` and the fake provider gets no second call; the queue limit of 4 for each user, with two starts at the same time | Vitest + Docker Postgres |
+| Integration | Rate limits: two Nest app instances on one Postgres share one count | Vitest + Docker Postgres |
+| Integration | Sync on read: a read of a due generation starts one sync, and two reads at the same time start one sync | Vitest + Docker Postgres |
 | Integration | Ownership: user B gets `404` for each route that takes user A's ID | Vitest + Supertest |
 | Web | Form checks and the helper fill-in | Vitest + Testing Library |
 | End to end | Sign up → add a fake connection → make a song → play it | Playwright, one test |
-| Manual | One real song with each of the three adapters on the production setup before launch | — |
+| Manual | One real song with each of the three adapters on the production setup before launch. For ElevenLabs, a 180 s song must finish in less than 240 s. | — |
 
 ## 12. Build order
 
 Each milestone ends with working, tested code.
 
 1. **Database and auth.** Drizzle, Postgres in Docker for development, Better Auth, the sign-in and
-   sign-up pages, the rewrite, and `proxy.ts`.
+   sign-up pages, `vercel.json` with the two services, and `proxy.ts`.
 2. **Connections.** `KeyVault`, `safeFetch`, the provider registry, the connection routes, and the
    Settings page.
 3. **Helper.** `OpenAiCompatibleTextProvider`, `/api/assist`, and the Studio form with helper buttons.
-4. **Job flow.** `KieMusicProvider`, submit, webhook, sync, the poller, and the "Takes" panel.
+4. **Job flow.** `KieMusicProvider`, submit, webhook, sync, sync on read, the daily sweep, and the
+   "Takes" panel.
 5. **Storage and library.** R2 copy, the library page, the player bar, rename, delete, and download.
 6. **More adapters.** `SunoClassicMusicProvider` (job flow), then `ElevenLabsMusicProvider` with the direct
    flow runner (§5.4).
-7. **Deployment.** API Dockerfile, Dokploy services, Cloudflare Tunnel, backups, Vercel project, and the
-   pre-launch checks in §7.4 and §11.
+7. **Deployment.** The Vercel project on Pro, the checks in §2.3, the Neon integration and a restore test,
+   the domain, the Firewall rule, and the pre-launch checks in §7.4 and §11.
