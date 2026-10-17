@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type CSSProperties, useState } from 'react';
+import { type CSSProperties, useRef, useState } from 'react';
 import { Logo } from '@/components/brand/logo';
 import { photoStyle, StickerColumns } from '@/components/brand/sticker-columns';
 import { COVER_CREDITS } from '@/components/legal/photo-credits';
@@ -16,13 +16,32 @@ function dockWidth(index: number, hover: number): number {
   return [96, 80, 66][distance] ?? 56;
 }
 
+// The sample songs of the covers that have one, by cover image. The files are in public/samples.
+const SAMPLE_SONGS: Record<string, string> = {
+  i1: '/samples/the-cat-who-sailed.mp3',
+};
+
 // The Home hero: a record sleeve with sample cover art, and a dock to look through the covers.
-// The canvas also plays sample songs. Minstrel has no sample audio yet, so the hero shows covers only.
+// A cover with a sample song gets a play button. The other covers show the art only.
 export function HomeHero() {
   const [current, setCurrent] = useState(0);
   const [hover, setHover] = useState(-1);
+  const [playing, setPlaying] = useState(false);
+  const audio = useRef<HTMLAudioElement>(null);
   const cover = COVER_CREDITS[current];
-  const step = (by: number) => setCurrent((n) => (n + by + COVER_CREDITS.length) % COVER_CREDITS.length);
+  const sample = SAMPLE_SONGS[cover.img];
+
+  // A removed audio element keeps playing in the browser, so stop the song before the cover changes.
+  const show = (n: number) => {
+    audio.current?.pause();
+    setCurrent(n);
+  };
+  const step = (by: number) => show((current + by + COVER_CREDITS.length) % COVER_CREDITS.length);
+  const toggle = () => {
+    if (!audio.current) return;
+    if (audio.current.paused) void audio.current.play();
+    else audio.current.pause();
+  };
 
   return (
     <section className="home-hero" aria-label="Minstrel">
@@ -66,6 +85,28 @@ export function HomeHero() {
               <path d="M8 3v10L1 8zM15 3v10L8 8z" />
             </svg>
           </button>
+          {sample && (
+            <>
+              <audio
+                ref={audio}
+                src={sample}
+                preload="none"
+                onPlay={() => setPlaying(true)}
+                onPause={() => setPlaying(false)}
+                onEnded={() => setPlaying(false)}
+              />
+              <button
+                type="button"
+                className="home-mb"
+                aria-label={`${playing ? 'Pause' : 'Play'} ${cover.song}`}
+                onClick={toggle}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d={playing ? 'M3 2h4v12H3zM9 2h4v12H9z' : 'M4 2v12l10-6z'} />
+                </svg>
+              </button>
+            </>
+          )}
           <button type="button" className="home-mb" aria-label="Next cover" onClick={() => step(1)}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <path d="M1 3v10l7-5zM8 3v10l7-5z" />
@@ -89,7 +130,7 @@ export function HomeHero() {
               className="home-dkb"
               aria-label={`Show ${credit.song}`}
               aria-pressed={n === current}
-              onClick={() => setCurrent(n)}
+              onClick={() => show(n)}
               onFocus={() => setHover(n)}
               onBlur={() => setHover(-1)}
             >
