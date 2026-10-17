@@ -205,8 +205,9 @@
 }
 
 @media (max-width: 900px) {
+  /* The entrance animation owns transform, so the size change uses the separate scale property. */
   .home-case {
-    transform: scale(0.8);
+    scale: 0.8;
   }
 
   .home-about-photo {
@@ -231,7 +232,7 @@
 
   .home-case {
     margin: -30px 0;
-    transform: scale(0.7);
+    scale: 0.7;
   }
 
   .home-dock {

@@ -67,8 +67,11 @@ export function AuthStage({ label, heading, starText, children }: AuthStageProps
         </h1>
       </div>
 
-      <div className={`auth-bottom auth-fu`} style={delay(0.8)}>
-        {children}
+      {/* The outer block places the form with transform, so the entrance animation goes on an inner block. */}
+      <div className="auth-bottom">
+        <div className="auth-fu" style={delay(0.8)}>
+          {children}
+        </div>
       </div>
     </div>
   );

@@ -242,8 +242,9 @@
     margin: 48px auto 0;
   }
 
+  /* The entrance animation owns transform, so the size change uses the separate scale property. */
   .auth-case {
-    transform: scale(0.7);
+    scale: 0.7;
     margin: -30px 0;
   }
 
