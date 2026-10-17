@@ -2,6 +2,11 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# Vercel moves the built API files to the top of its function, away from the
+# apps/api/node_modules links that the default pnpm layout makes. With real
+# package folders in the top node_modules, the moved API still finds them.
+nodeLinker: hoisted
+
 allowBuilds:
   esbuild: true
   sharp: false
