@@ -1,8 +1,7 @@
-// Vercel runs the built API from the top folder of its function, away from the repository
-// paths of its packages, and its Node starts with --no-experimental-require-module, so a
-// CommonJS package (such as @nestjs/throttler) cannot require() the ES module build of Nest.
-// This step bundles the whole server into dist/main.js, as the NestJS serverless guide
-// recommends. The bundle needs no node_modules folder at run time.
+// This step bundles each server entry point (dist/main.js and dist/migrate.js) into one file, as the
+// NestJS serverless guide recommends. A bundle needs no node_modules folder at run time, so the
+// Docker image copies only dist/ and drizzle/. Node does not let a CommonJS package (such as
+// @nestjs/throttler) require() the ES module build of Nest in every setup, and the bundle avoids it.
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -15,8 +14,8 @@ const sharedEntry = fileURLToPath(
 
 await build({
   absWorkingDir: apiRoot,
-  entryPoints: ['dist/main.js'],
-  outfile: 'dist/main.js',
+  entryPoints: ['dist/main.js', 'dist/migrate.js'],
+  outdir: 'dist',
   allowOverwrite: true,
   bundle: true,
   platform: 'node',
@@ -87,8 +86,8 @@ await build({
   ],
 });
 
-// Vercel puts dist/* at the function root, away from the API package.json. This file tells
-// Node that main.js is an ES module.
+// The Docker image copies dist/* without the API package.json. This file tells Node that the
+// bundles are ES modules.
 await writeFile(
   new URL('../dist/package.json', import.meta.url),
   '{"type":"module"}\n',

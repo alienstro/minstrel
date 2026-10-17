@@ -1,5 +1,4 @@
 import { Global, Inject, Module, type OnApplicationShutdown } from '@nestjs/common';
-import { attachDatabasePool } from '@vercel/functions';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
@@ -12,12 +11,7 @@ export type Db = NodePgDatabase;
   providers: [
     {
       provide: PG_POOL,
-      useFactory: () => {
-        const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-        // Vercel closes idle clients before it suspends the instance (spec §2.4).
-        attachDatabasePool(pool);
-        return pool;
-      },
+      useFactory: () => new pg.Pool({ connectionString: process.env.DATABASE_URL }),
     },
     {
       provide: DB,
