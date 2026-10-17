@@ -231,3 +231,90 @@ describe('KieMusicProvider', () => {
     });
   });
 });
+
+// From docs.kie.ai: Generate Lyrics (fetched 2026-10-17). The record keeps the versions in
+// resultJson.resultObject.lyricsData.
+const lyricsRecord = (state: string, lyricsData: object[]) =>
+  record(state, { resultJson: JSON.stringify({ resultObject: { lyricsData } }) });
+
+// A clock that moves only when the provider waits, so the tests run at once.
+function fakeTime() {
+  let now = 0;
+  const waits: number[] = [];
+  return {
+    waits,
+    now: () => now,
+    sleep: async (ms: number) => {
+      waits.push(ms);
+      now += ms;
+    },
+  };
+}
+
+describe('KieMusicProvider.writeLyrics', () => {
+  it('writeLyrics creates an ai-music-api/generate-lyrics task and returns the first complete version', async () => {
+    const { fetch, calls } = fakeFetch(
+      json(createOk),
+      json(record('generating')),
+      json(
+        lyricsRecord('success', [
+          { text: '', title: 'Rain', status: 'failed', error_message: 'busy' },
+          { text: '[Verse]\nDrip drop', title: 'Rain', status: 'complete' },
+          { text: '[Verse]\nSecond', title: 'Rain', status: 'complete' },
+        ]),
+      ),
+    );
+    const time = fakeTime();
+    const kie = new KieMusicProvider(fetch, time.sleep, time.now);
+
+    const lyrics = await kie.writeLyrics(conn, 'a song about rain');
+
+    expect(lyrics).toBe('[Verse]\nDrip drop');
+    expect(calls[0]!.url).toBe('https://api.kie.ai/api/v1/jobs/createTask');
+    expect(calls[0]!.body).toEqual({ model: 'ai-music-api/generate-lyrics', input: { prompt: 'a song about rain' } });
+    expect(calls[1]!.url).toBe('https://api.kie.ai/api/v1/jobs/recordInfo?taskId=5c79be8e');
+    expect(time.waits).toEqual([2000, 2000]);
+  });
+
+  it('writeLyrics cuts the prompt to 200 characters', async () => {
+    const { fetch, calls } = fakeFetch(
+      json(createOk),
+      json(lyricsRecord('success', [{ text: 'Words', status: 'complete' }])),
+    );
+    const time = fakeTime();
+    await new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, `  ${'a'.repeat(250)}  `);
+    expect(calls[0]!.body.input.prompt).toBe('a'.repeat(200));
+  });
+
+  it('writeLyrics fails when no version is complete', async () => {
+    const { fetch } = fakeFetch(
+      json(createOk),
+      json(lyricsRecord('success', [{ text: '', status: 'failed', error_message: 'busy' }])),
+    );
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).rejects.toMatchObject({
+      code: 'generation_failed',
+      message: 'kie.ai could not write the lyrics: busy',
+    });
+  });
+
+  it('writeLyrics fails with the reason of a failed task', async () => {
+    const { fetch } = fakeFetch(json(createOk), json(record('fail', { failMsg: 'SENSITIVE_WORD_ERROR' })));
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).rejects.toMatchObject({
+      code: 'generation_failed',
+      message: 'kie.ai could not write the lyrics: SENSITIVE_WORD_ERROR',
+    });
+  });
+
+  it('writeLyrics stops after the time limit', async () => {
+    const pending = Array.from({ length: 40 }, () => json(record('generating')));
+    const { fetch, calls } = fakeFetch(json(createOk), ...pending);
+    const time = fakeTime();
+    await expect(new KieMusicProvider(fetch, time.sleep, time.now).writeLyrics(conn, 'rain')).rejects.toMatchObject({
+      code: 'provider_timeout',
+    });
+    expect(time.now()).toBeLessThanOrEqual(60_000);
+    expect(calls.length).toBeLessThanOrEqual(31);
+  });
+});

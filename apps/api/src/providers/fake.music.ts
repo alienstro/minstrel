@@ -56,6 +56,10 @@ export class FakeMusicProvider implements MusicProvider {
     return { taskId: `fake-${randomUUID()}` };
   }
 
+  async writeLyrics(_conn: DecryptedConnection, prompt: string): Promise<string> {
+    return `[Verse]\nFake lyrics about ${prompt}`;
+  }
+
   async getTask(_conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult> {
     return {
       state: 'complete',

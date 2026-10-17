@@ -61,6 +61,8 @@ export interface MusicProvider extends ProviderBase {
     callbackUrl?: string,
   ): Promise<{ taskId: string }>;
   getTask(conn: DecryptedConnection, taskId: string): Promise<MusicTaskResult>;
+  /** Writes lyrics from an idea, for a user with no text key. Only some providers have it. */
+  writeLyrics?(conn: DecryptedConnection, prompt: string): Promise<string>;
 }
 
 export type AssistRequest = Omit<AssistBody, 'connectionId'> & {
