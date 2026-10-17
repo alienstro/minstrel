@@ -5,7 +5,7 @@ import {
   Headers,
   fetch as undiciFetch,
   type RequestInit,
-  type Response,
+  Response,
 } from 'undici';
 import { isBlockedAddress } from './ip-policy.js';
 
@@ -85,52 +85,57 @@ export function createSafeFetch(
     let body = request.body;
     const headers = new Headers(request.headers);
 
-    for (let hop = 0; ; hop++) {
-      assertSafeUrl(current);
-      const firstByte = abortAfter(
-        firstByteTimeoutMs,
-        `${current.host} did not answer in ${firstByteTimeoutMs / 1000} s`,
-      );
-      let response: Response;
-      try {
-        response = await transport(current.toString(), {
-          ...request,
-          method,
-          body,
-          headers,
-          redirect: 'manual',
-          signal: AbortSignal.any([...callerSignals, firstByte.signal]),
-        });
-      } catch (error) {
-        // undici reports a connect error as "fetch failed" with the lookup error as its cause.
-        const cause = (error as { cause?: unknown }).cause;
-        throw cause instanceof SafeFetchError ? cause : error;
-      } finally {
-        firstByte.clear();
-      }
-
-      const location = response.headers.get('location');
-      if (response.status < 300 || response.status >= 400 || !location)
-        return response;
-      if (hop >= MAX_REDIRECTS)
-        throw new SafeFetchError(
-          `The call followed more than ${MAX_REDIRECTS} redirects`,
+    try {
+      for (let hop = 0; ; hop++) {
+        assertSafeUrl(current);
+        const firstByte = abortAfter(
+          firstByteTimeoutMs,
+          `${current.host} did not answer in ${firstByteTimeoutMs / 1000} s`,
         );
-      await response.body?.cancel();
+        let response: Response;
+        try {
+          response = await transport(current.toString(), {
+            ...request,
+            method,
+            body,
+            headers,
+            redirect: 'manual',
+            signal: AbortSignal.any([...callerSignals, firstByte.signal]),
+          });
+        } catch (error) {
+          // undici reports a connect error as "fetch failed" with the lookup error as its cause.
+          const cause = (error as { cause?: unknown }).cause;
+          throw cause instanceof SafeFetchError ? cause : error;
+        } finally {
+          firstByte.clear();
+        }
 
-      const next = new URL(location, current);
-      if (next.origin !== current.origin)
-        for (const name of KEY_HEADERS) headers.delete(name);
-      if (
-        response.status === 303 ||
-        ((response.status === 301 || response.status === 302) &&
-          method === 'POST')
-      ) {
-        method = 'GET';
-        body = undefined;
-        headers.delete('content-type');
+        const location = response.headers.get('location');
+        if (response.status < 300 || response.status >= 400 || !location)
+          return untilBodyEnds(response, total.clear);
+        if (hop >= MAX_REDIRECTS)
+          throw new SafeFetchError(
+            `The call followed more than ${MAX_REDIRECTS} redirects`,
+          );
+        await response.body?.cancel();
+
+        const next = new URL(location, current);
+        if (next.origin !== current.origin)
+          for (const name of KEY_HEADERS) headers.delete(name);
+        if (
+          response.status === 303 ||
+          ((response.status === 301 || response.status === 302) &&
+            method === 'POST')
+        ) {
+          method = 'GET';
+          body = undefined;
+          headers.delete('content-type');
+        }
+        current = next;
       }
-      current = next;
+    } catch (error) {
+      total.clear();
+      throw error;
     }
   };
 
@@ -138,6 +143,38 @@ export function createSafeFetch(
 }
 
 export const safeFetch = createSafeFetch();
+
+/** The total timer covers the body, so it stops only when the body ends, fails, or is cancelled. */
+function untilBodyEnds(response: Response, stop: () => void): Response {
+  if (!response.body) {
+    stop();
+    return response;
+  }
+  const reader = response.body.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          stop();
+          controller.close();
+        } else controller.enqueue(value);
+      } catch (error) {
+        stop();
+        controller.error(error);
+      }
+    },
+    cancel(reason) {
+      stop();
+      return reader.cancel(reason);
+    },
+  });
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
 
 function assertSafeUrl(url: URL): void {
   if (url.protocol !== 'https:')

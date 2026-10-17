@@ -139,5 +139,40 @@ describe('safeFetch', () => {
       await vi.advanceTimersByTimeAsync(1);
       await assertion;
     });
+
+    // The total timer covers the body too. Each way a call ends must stop it, or it stays for up to 5 minutes.
+    const replyWith = (response: () => Response) =>
+      createSafeFetch({
+        lookup: resolveTo('8.8.8.8'),
+        transport: async () => response(),
+      });
+
+    it('the timers stop when the caller reads the whole body', async () => {
+      const res = await replyWith(() => new Response('ok'))('https://api.example.com/x');
+      expect(await res.text()).toBe('ok');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('the timers stop when the caller cancels the body', async () => {
+      const res = await replyWith(() => new Response('ok'))('https://api.example.com/x');
+      await res.body!.cancel();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('the timers stop at once for a reply with no body', async () => {
+      await replyWith(() => new Response(null, { status: 204 }))('https://api.example.com/x');
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('the timers stop when the call throws', async () => {
+      const safeFetch = createSafeFetch({
+        lookup: resolveTo('8.8.8.8'),
+        transport: async () => {
+          throw new Error('socket hang up');
+        },
+      });
+      await expect(safeFetch('https://api.example.com/x')).rejects.toThrow('socket hang up');
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 });
