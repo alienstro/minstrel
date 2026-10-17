@@ -78,3 +78,30 @@ The Vercel docs do not state these items for services. Check each one and write 
    - A Suno-compatible service: the song completes, and both takes play from R2.
    - ElevenLabs: a 180 s song finishes in less than 240 s. Write the measured time here.
 3. **Account deletion.** Delete a test account. Its objects under `users/<userId>/` in R2 must be gone.
+
+## 9. Rotate the key encryption key (§7.1)
+
+Do these steps in this order. A Vercel environment change applies only to a new deployment.
+
+1. Make a new key with `openssl rand -base64 32`.
+2. On Vercel, set `KEY_ENCRYPTION_KEYS` to `1:<old key>,2:<new key>` for Production and Preview. Keep the
+   old key in the list.
+3. Redeploy Production. Wait until the new deployment serves the traffic. From now on, the API seals each
+   new key with version 2.
+
+   > **Caution:** Do not do step 4 before step 3 is complete. The old deployment still seals keys with
+   > version 1, and the script does not see a key that the old deployment writes after the script reads
+   > the rows.
+
+4. In `apps/api`, run the script with the unpooled URL:
+   `DATABASE_URL_UNPOOLED=<Neon unpooled URL> KEY_ENCRYPTION_KEYS='1:<old key>,2:<new key>' pnpm keys:rotate`.
+   It prints `Rotated <n> provider keys to version 2.`
+5. Run the same command again. It must print `Rotated 0 provider keys to version 2.` The script skips a key
+   that a user replaces while it runs, so the second run moves any key that the first run skipped.
+6. In the Neon SQL editor, run `SELECT key_version, count(*) FROM provider_connections GROUP BY 1;`.
+   Each row must show version 2.
+
+   > **Warning:** Do not remove the old key before step 6 shows only version 2. A key with version 1
+   > then cannot be decrypted, and its user must add the key again.
+
+7. Set `KEY_ENCRYPTION_KEYS` to `2:<new key>`, then redeploy Production.

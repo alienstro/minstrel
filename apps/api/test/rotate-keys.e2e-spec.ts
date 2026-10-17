@@ -95,6 +95,49 @@ describe('rotateKeys (e2e)', () => {
     ).toThrow();
   });
 
+  it('a key that the user replaces during the rotation is kept', async () => {
+    const oldVault = new KeyVault(parseKeyring(k1));
+    const id = await insertSealed(oldVault, 'old', 'sk-old-1234');
+    // The API still runs the old keyring, so the new key also has version 1.
+    const replaceKey = async () => {
+      const sealed = oldVault.encrypt('sk-new-9999', `${userId}:${id}`);
+      await db
+        .update(providerConnections)
+        .set({
+          keyCiphertext: sealed.ciphertext,
+          keyIv: sealed.iv,
+          keyTag: sealed.tag,
+          keyVersion: sealed.version,
+          keyLast4: '9999',
+        })
+        .where(eq(providerConnections.id, id));
+    };
+    // The user saves the new key after the script reads the rows and before it writes.
+    const racing = {
+      select: () => ({
+        from: (table: typeof providerConnections) => ({
+          where: async (condition: Parameters<ReturnType<ReturnType<Db['select']>['from']>['where']>[0]) => {
+            const rows = await db.select().from(table).where(condition);
+            await replaceKey();
+            return rows;
+          },
+        }),
+      }),
+      update: db.update.bind(db),
+    } as unknown as Db;
+
+    const vault = new KeyVault(parseKeyring(`${k1},${k2}`));
+    expect(await rotateKeys(racing, vault)).toEqual({ rotated: 0 });
+    const row = await load(id);
+    const sealed = {
+      ciphertext: row.keyCiphertext,
+      iv: row.keyIv,
+      tag: row.keyTag,
+      version: row.keyVersion,
+    };
+    expect(vault.decrypt(sealed, `${userId}:${id}`)).toBe('sk-new-9999');
+  });
+
   it('rows at the highest version do not change', async () => {
     const vault = new KeyVault(parseKeyring(`${k1},${k2}`));
     const id = await insertSealed(vault, 'new', 'sk-new-5678');

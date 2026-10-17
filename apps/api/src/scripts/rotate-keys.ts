@@ -28,7 +28,8 @@ export async function rotateKeys(
       aad,
     );
     const sealed = vault.encrypt(plain, aad);
-    // The version check skips a row whose key the user replaced after the select.
+    // Each encryption gets a new random IV, so the IV check skips a row whose key the user
+    // replaced after the select, also when the API still runs the old keyring.
     const updated = await db
       .update(providerConnections)
       .set({
@@ -41,6 +42,7 @@ export async function rotateKeys(
         and(
           eq(providerConnections.id, row.id),
           eq(providerConnections.keyVersion, row.keyVersion),
+          eq(providerConnections.keyIv, row.keyIv),
         ),
       )
       .returning({ id: providerConnections.id });
