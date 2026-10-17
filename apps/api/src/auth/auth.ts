@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { CLIENT_IP_HEADER } from '../common/client-ip.js';
+import { CLIENT_IP_HEADERS } from '../common/client-ip.js';
 import { isFakeMode } from '../common/fake-mode.js';
 import type { Db } from '../db/db.module.js';
 import * as authSchema from '../db/auth-schema.js';
@@ -50,7 +50,7 @@ export function createAuth(db: Db, env: AuthEnv, audio: AudioStore) {
     rateLimit: { enabled: true, storage: 'database' },
     advanced: {
       useSecureCookies: env.WEB_ORIGIN.startsWith('https://'),
-      ipAddress: { ipAddressHeaders: [CLIENT_IP_HEADER] },
+      ipAddress: { ipAddressHeaders: [...CLIENT_IP_HEADERS] },
       database: { generateId: 'uuid' },
     },
     hooks: {},

@@ -3,7 +3,7 @@ import { ThrottlerGuard, type ThrottlerStorage } from '@nestjs/throttler';
 import type { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface.js';
 import { sql } from 'drizzle-orm';
 import type { Db } from '../db/db.module.js';
-import { CLIENT_IP_HEADER } from './client-ip.js';
+import { clientIpFromHeaders } from './client-ip.js';
 
 // Spec §4.5 and §7.4. Many function instances run at the same time, so the count lives in Postgres.
 // One upsert counts the hit and starts a new window when reset_at has passed. Postgres now() is the clock.
@@ -47,7 +47,6 @@ export class UserThrottlerGuard extends ThrottlerGuard {
   ): Promise<string> {
     const userId: string | undefined = req.user?.id;
     if (userId) return `user:${userId}`;
-    const clientIp = req.headers?.[CLIENT_IP_HEADER];
-    return `ip:${typeof clientIp === 'string' ? clientIp : req.ip}`;
+    return `ip:${clientIpFromHeaders(req.headers) ?? req.ip}`;
   }
 }

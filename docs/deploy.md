@@ -52,8 +52,13 @@ its token in the `cloudflared` app as `TUNNEL_TOKEN`, and attach the app to `dok
 - The API reads the user IP from the `cf-connecting-ip` header. Traefik sets `x-real-ip` to the
   tunnel container, so that header is not the user IP.
 
+- A request without `cf-connecting-ip` falls back to `x-real-ip`, so it still has its own rate
+  limit.
+
 **Caution:** Do not open ports 80, 443 or 3000 on the router. Then a request could skip Cloudflare
-and set a false `cf-connecting-ip`.
+and set a false `cf-connecting-ip`. A device on the home network or on Tailscale can already do
+this, so it can avoid the anonymous rate limits. This is an accepted risk, because you control
+those devices.
 
 ## GitHub secrets
 

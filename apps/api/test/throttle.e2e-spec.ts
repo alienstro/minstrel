@@ -58,6 +58,15 @@ describe('rate limits on Postgres (e2e)', () => {
     expect((await hit(a, '203.0.113.50')).status).toBe(200);
   });
 
+  it('falls back to x-real-ip when cf-connecting-ip is missing', async () => {
+    const lan = (ip: string) =>
+      request(a.app.getHttpServer()).get('/api/limited').set('x-real-ip', ip);
+    await lan('192.168.1.20');
+    await lan('192.168.1.20');
+    expect((await lan('192.168.1.20')).status).toBe(429);
+    expect((await lan('192.168.1.21')).status).toBe(200);
+  });
+
   it('the request over the limit gives 429 rate_limited', async () => {
     await hit(a);
     await hit(a);
