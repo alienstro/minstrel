@@ -88,4 +88,24 @@ describe('logger', () => {
     expect(output).toContain('/api/webhooks/kie/0199');
     expect(output).not.toMatch(/cb-secret|reset-secret/);
   });
+
+  it('a logged redirect has no Location URL', () => {
+    const lines: string[] = [];
+    const stream = new Writable({
+      write(chunk, _enc, done) {
+        lines.push(String(chunk));
+        done();
+      },
+    });
+    const logger = pino(loggerOptions(), stream);
+    logger.info({
+      res: {
+        statusCode: 302,
+        headers: {
+          location: 'https://r2.example/a.mp3?X-Amz-Signature=sig-secret',
+        },
+      },
+    });
+    expect(lines.join('')).not.toContain('sig-secret');
+  });
 });

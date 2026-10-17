@@ -15,6 +15,8 @@ export const PINO_REDACT_PATHS = [
   '*.headers["xi-api-key"]',
   '*.headers["x-api-key"]',
   '*.headers["set-cookie"]',
+  // A 302 Location holds a signed R2 URL or an auth token.
+  '*.headers.location',
 ];
 
 export function loggerOptions(): LoggerOptions {
