@@ -3,6 +3,7 @@ import type { GenerationStatus } from '@minstrel/shared';
 // Spec §5.2–§5.4. Pure rules, so that the sync, the reads, and the sweep agree.
 
 export const TIMEOUT_MS = 30 * 60_000;
+// One getTask call ends in 30 s (API_TIMEOUT_MS in envelope.ts), so the lease leaves 60 s for the save.
 export const SYNC_LEASE_SECONDS = 90;
 export const DIRECT_LEASE_SECONDS = 6 * 60;
 export const DIRECT_ABORT_MS = 240_000;
