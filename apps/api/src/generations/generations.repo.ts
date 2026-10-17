@@ -1,10 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DB, type Db } from '../db/db.module.js';
-import { generations } from '../db/schema.js';
+import { generations, tracks } from '../db/schema.js';
 import { JOB_DUE_STATES } from './rules.js';
 
 export type GenerationRow = typeof generations.$inferSelect;
+export type TrackRow = typeof tracks.$inferSelect;
+
+// Spec §5.3 step 4: a job generation is due in pending, text_ready, or first_ready at next_poll_at.
+const isDue = and(
+  eq(generations.flow, 'job'),
+  inArray(generations.status, JOB_DUE_STATES),
+  lte(generations.nextPollAt, sql`now()`),
+)!;
 
 // Spec §5.3 and §5.4. Each time check uses Postgres now(), so the app clock of a function instance
 // never decides a lease or a due poll.
@@ -12,8 +20,15 @@ export type GenerationRow = typeof generations.$inferSelect;
 export class GenerationsRepo {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  /** One UPDATE ... RETURNING statement. It gives null when another worker holds a live lease. */
-  async claimLease(id: string, seconds: number): Promise<GenerationRow | null> {
+  /**
+   * One UPDATE ... RETURNING statement. It gives null when another worker holds a live lease.
+   * With ifDue, it also gives null when the row is not due, for example after another sync polled it.
+   */
+  async claimLease(
+    id: string,
+    seconds: number,
+    opts: { ifDue?: boolean } = {},
+  ): Promise<GenerationRow | null> {
     const [row] = await this.db
       .update(generations)
       .set({ leaseUntil: sql`now() + make_interval(secs => ${seconds})` })
@@ -21,6 +36,7 @@ export class GenerationsRepo {
         and(
           eq(generations.id, id),
           or(isNull(generations.leaseUntil), lt(generations.leaseUntil, sql`now()`)),
+          opts.ifDue ? isDue : undefined,
         ),
       )
       .returning();
@@ -43,14 +59,7 @@ export class GenerationsRepo {
     return this.db
       .select()
       .from(generations)
-      .where(
-        and(
-          eq(generations.flow, 'job'),
-          inArray(generations.status, JOB_DUE_STATES),
-          lte(generations.nextPollAt, sql`now()`),
-          userId ? eq(generations.userId, userId) : undefined,
-        ),
-      )
+      .where(and(isDue, userId ? eq(generations.userId, userId) : undefined))
       .orderBy(asc(generations.nextPollAt))
       .limit(limit);
   }
@@ -69,5 +78,44 @@ export class GenerationsRepo {
       )
       .orderBy(asc(generations.createdAt))
       .limit(limit);
+  }
+
+  /** One generation of the user, and whether it is due now. */
+  async findForUser(
+    id: string,
+    userId: string,
+  ): Promise<{ row: GenerationRow; due: boolean } | null> {
+    const [found] = await this.db
+      .select({ row: generations, due: sql<boolean>`coalesce(${isDue}, false)` })
+      .from(generations)
+      .where(and(eq(generations.id, id), eq(generations.userId, userId)));
+    return found ?? null;
+  }
+
+  /**
+   * A page of the user's generations, newest first. The cursor is the ID of the last row of the
+   * previous page. The database compares its exact created_at, so no row is skipped or repeated.
+   */
+  pageForUser(userId: string, limit: number, cursor?: string): Promise<GenerationRow[]> {
+    const after = cursor
+      ? sql`(${generations.createdAt}, ${generations.id}) < (
+          SELECT g.created_at, g.id FROM generations g WHERE g.id = ${cursor} AND g.user_id = ${userId})`
+      : undefined;
+    return this.db
+      .select()
+      .from(generations)
+      .where(and(eq(generations.userId, userId), after))
+      .orderBy(desc(generations.createdAt), desc(generations.id))
+      .limit(limit);
+  }
+
+  /** The tracks of the generations, in the order the provider gave them. */
+  tracksOf(generationIds: string[]): Promise<TrackRow[]> {
+    if (generationIds.length === 0) return Promise.resolve([]);
+    return this.db
+      .select()
+      .from(tracks)
+      .where(inArray(tracks.generationId, generationIds))
+      .orderBy(asc(tracks.createdAt), asc(tracks.providerTrackId));
   }
 }

@@ -1,6 +1,6 @@
-import { Body, Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import type { GenerationDto } from '@minstrel/shared';
+import type { GenerationDto, Page } from '@minstrel/shared';
 import { UserThrottlerGuard } from '../common/pg-throttler.storage.js';
 import { UserId } from '../common/user-id.decorator.js';
 import { GenerationsService } from './generations.service.js';
@@ -16,5 +16,18 @@ export class GenerationsController {
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   create(@UserId() userId: string, @Body() body: unknown): Promise<GenerationDto> {
     return this.generationsService.create(userId, body);
+  }
+
+  @Get()
+  list(
+    @UserId() userId: string,
+    @Query('cursor') cursor?: string,
+  ): Promise<Page<GenerationDto>> {
+    return this.generationsService.list(userId, cursor);
+  }
+
+  @Get(':id')
+  get(@UserId() userId: string, @Param('id') id: string): Promise<GenerationDto> {
+    return this.generationsService.get(userId, id);
   }
 }

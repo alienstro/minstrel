@@ -1,8 +1,5 @@
 import type { ErrorCode, GenerationDto, MusicAdapter, TrackDto } from '@minstrel/shared';
-import type { tracks } from '../db/schema.js';
-import type { GenerationRow } from './generations.repo.js';
-
-type TrackRow = typeof tracks.$inferSelect;
+import type { GenerationRow, TrackRow } from './generations.repo.js';
 
 // The DTOs leave out the provider IDs, the callback hash, the lease, and the provider URLs.
 export function toTrackDto(row: TrackRow): TrackDto {

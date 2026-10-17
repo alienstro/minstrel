@@ -38,8 +38,9 @@ export class SyncService {
     private readonly background: BackgroundWork,
   ) {}
 
-  async sync(generationId: string): Promise<void> {
-    const row = await this.repo.claimLease(generationId, SYNC_LEASE_SECONDS);
+  /** A read and the sweep pass ifDue, so a row that another sync just polled is not polled again. */
+  async sync(generationId: string, opts: { ifDue?: boolean } = {}): Promise<void> {
+    const row = await this.repo.claimLease(generationId, SYNC_LEASE_SECONDS, opts);
     if (!row) return;
 
     // A callback can come before submit saves provider_task_id. Submit sets the row due after that.
