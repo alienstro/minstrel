@@ -32,7 +32,7 @@ describe('origin guard (e2e)', () => {
   let t: TestApp;
 
   beforeAll(async () => {
-    t = await createTestApp([ProbeController]);
+    t = await createTestApp({ controllers: [ProbeController] });
   });
 
   afterAll(async () => {

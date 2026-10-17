@@ -7,7 +7,8 @@ import { generations, providerConnections, tracks } from '../src/db/schema.js';
 import { insertUser } from './support/fixtures.js';
 import { resetTestDb, TEST_DATABASE_URL } from './support/test-db.js';
 
-const UUID_V7 = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+const UUID_V7 =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 describe('schema (e2e)', () => {
   let pool: pg.Pool;
@@ -49,7 +50,10 @@ describe('schema (e2e)', () => {
   };
 
   const insertTrack = (generationId: string) =>
-    db.insert(tracks).values({ generationId, userId, providerTrackId: 'p1', title: 'Rain' }).returning();
+    db
+      .insert(tracks)
+      .values({ generationId, userId, providerTrackId: 'p1', title: 'Rain' })
+      .returning();
 
   beforeAll(async () => {
     await resetTestDb();
@@ -70,14 +74,20 @@ describe('schema (e2e)', () => {
     const connection = await insertConnection();
     const generation = await insertGeneration(connection.id);
     const [track] = await insertTrack(generation.id);
-    for (const id of [connection.id, generation.id, track!.id]) expect(id).toMatch(UUID_V7);
+    for (const id of [connection.id, generation.id, track!.id])
+      expect(id).toMatch(UUID_V7);
   });
 
   it('deleting a connection sets generations.connection_id to null', async () => {
     const connection = await insertConnection();
     const generation = await insertGeneration(connection.id);
-    await db.delete(providerConnections).where(eq(providerConnections.id, connection.id));
-    const [row] = await db.select().from(generations).where(eq(generations.id, generation.id));
+    await db
+      .delete(providerConnections)
+      .where(eq(providerConnections.id, connection.id));
+    const [row] = await db
+      .select()
+      .from(generations)
+      .where(eq(generations.id, generation.id));
     expect(row!.connectionId).toBeNull();
   });
 

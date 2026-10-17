@@ -12,7 +12,9 @@ import { OriginGuard } from './common/origin.guard.js';
 import { PgThrottlerStorage } from './common/pg-throttler.storage.js';
 import { authEnvFromProcess, createAuth } from './auth/auth.js';
 import { MAILER, ResendMailer, type Mailer } from './auth/mailer.js';
+import { ConnectionsModule } from './connections/connections.module.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
+import { ProvidersModule } from './providers/registry.js';
 
 const mailerProvider = {
   provide: MAILER,
@@ -34,6 +36,8 @@ class MailerModule {}
     LoggerModule.forRoot({ pinoHttp: loggerOptions() }),
     DbModule,
     BackgroundWorkModule,
+    ProvidersModule,
+    ConnectionsModule,
     // Each limited route sets its own limit with @Throttle (spec §7.4). The default is only a fallback.
     ThrottlerModule.forRootAsync({
       inject: [DB],

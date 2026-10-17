@@ -1,4 +1,5 @@
 import type {
+  Adapter,
   AssistBody,
   AssistResult,
   GenerationInput,
@@ -13,6 +14,7 @@ import type { ZodType } from 'zod';
 export interface DecryptedConnection {
   id: string;
   userId: string;
+  adapter: Adapter;
   label: string;
   baseUrl: string;
   apiKey: string;

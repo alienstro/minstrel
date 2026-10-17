@@ -5,11 +5,18 @@ import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { MAILER } from '../../src/auth/mailer.js';
 import { BackgroundWork } from '../../src/common/background-work.js';
+import {
+  MUSIC_PROVIDERS,
+  TEXT_PROVIDER,
+} from '../../src/providers/registry.js';
+import type { MusicProvider, TextProvider } from '../../src/providers/types.js';
 import { FakeBackgroundWork } from './fake-background-work.js';
 import { FakeMailer } from './fake-mailer.js';
+import { fakeMusicProviders, fakeTextProvider } from './fake-providers.js';
 import { TEST_DATABASE_URL } from './test-db.js';
 
 export const TEST_ORIGIN = 'http://localhost:3000';
+export const TEST_KEY_ENCRYPTION_KEYS = `1:${Buffer.alloc(32, 7).toString('base64')}`;
 
 export interface TestApp {
   app: INestApplication<App>;
@@ -17,24 +24,36 @@ export interface TestApp {
   background: FakeBackgroundWork;
 }
 
-// `controllers` adds test-only routes, for example a probe route for a guard test.
+export interface TestAppOptions {
+  /** Test-only routes, for example a probe route for a guard test. */
+  controllers?: Type[];
+  /** The fake providers replace the real ones, so no test calls a provider. */
+  musicProviders?: MusicProvider[];
+  textProvider?: TextProvider;
+}
+
 export async function createTestApp(
-  controllers: Type[] = [],
+  options: TestAppOptions = {},
 ): Promise<TestApp> {
   process.env.DATABASE_URL = TEST_DATABASE_URL;
   process.env.LOG_LEVEL ??= 'silent';
   process.env.WEB_ORIGIN = TEST_ORIGIN;
   process.env.BETTER_AUTH_SECRET = 'test-secret-test-secret-test-secret-00';
+  process.env.KEY_ENCRYPTION_KEYS = TEST_KEY_ENCRYPTION_KEYS;
   const mailer = new FakeMailer();
   const background = new FakeBackgroundWork();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
-    controllers,
+    controllers: options.controllers ?? [],
   })
     .overrideProvider(MAILER)
     .useValue(mailer)
     .overrideProvider(BackgroundWork)
     .useValue(background)
+    .overrideProvider(MUSIC_PROVIDERS)
+    .useValue(options.musicProviders ?? fakeMusicProviders())
+    .overrideProvider(TEXT_PROVIDER)
+    .useValue(options.textProvider ?? fakeTextProvider())
     .compile();
   const app = moduleRef.createNestApplication<INestApplication<App>>({
     bodyParser: false,

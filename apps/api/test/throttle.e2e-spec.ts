@@ -29,8 +29,8 @@ describe('rate limits on Postgres (e2e)', () => {
   let b: TestApp;
 
   beforeAll(async () => {
-    a = await createTestApp([LimitedController]);
-    b = await createTestApp([LimitedController]);
+    a = await createTestApp({ controllers: [LimitedController] });
+    b = await createTestApp({ controllers: [LimitedController] });
   });
 
   beforeEach(async () => {

@@ -1,7 +1,11 @@
 import request from 'supertest';
 import { sql } from 'drizzle-orm';
 import { DB, type Db } from '../src/db/db.module.js';
-import { createTestApp, TEST_ORIGIN, type TestApp } from './support/test-app.js';
+import {
+  createTestApp,
+  TEST_ORIGIN,
+  type TestApp,
+} from './support/test-app.js';
 import { resetTestDb } from './support/test-db.js';
 
 const signUp = (t: TestApp, email: string) =>
@@ -59,7 +63,9 @@ describe('auth (e2e)', () => {
     await signUp(t, 'ada@example.com');
     await verify(t);
     const db = t.app.get<Db>(DB);
-    const { rows } = await db.execute<{ ip_address: string }>(sql`SELECT ip_address FROM session`);
+    const { rows } = await db.execute<{ ip_address: string }>(
+      sql`SELECT ip_address FROM session`,
+    );
     expect(rows.map((r) => r.ip_address)).toEqual(['203.0.113.7']);
   });
 });

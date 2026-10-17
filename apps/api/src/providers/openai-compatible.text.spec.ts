@@ -6,6 +6,7 @@ import type { DecryptedConnection } from './types.js';
 const conn: DecryptedConnection = {
   id: 'c1',
   userId: 'u1',
+  adapter: 'openai_compatible',
   label: 'My OpenAI',
   baseUrl: 'https://api.openai.example/v1/',
   apiKey: 'sk-test-1234',
