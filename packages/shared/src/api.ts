@@ -79,6 +79,8 @@ export interface ModelOption {
 export const assistBodySchema = z.object({
   connectionId: z.uuid(),
   task: z.enum(['lyrics', 'style', 'title']),
+  /** The model to use. Without it, the connection's default model. */
+  model: z.string().trim().min(1).max(200).optional(),
   idea: z.string().trim().min(1).max(3000),
   fields: z
     .object({

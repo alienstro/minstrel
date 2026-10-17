@@ -12,6 +12,8 @@ import { OriginGuard } from './common/origin.guard.js';
 import { PgThrottlerStorage } from './common/pg-throttler.storage.js';
 import { authEnvFromProcess, createAuth } from './auth/auth.js';
 import { MAILER, ResendMailer, type Mailer } from './auth/mailer.js';
+import { AssistController } from './assist/assist.controller.js';
+import { AssistService } from './assist/assist.service.js';
 import { ConnectionsModule } from './connections/connections.module.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
 import { ProvidersModule } from './providers/providers.module.js';
@@ -56,9 +58,10 @@ class MailerModule {}
       }),
     }),
   ],
-  controllers: [AppController],
+  controllers: [AppController, AssistController],
   providers: [
     AppService,
+    AssistService,
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
     { provide: APP_GUARD, useClass: OriginGuard },
   ],
