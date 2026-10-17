@@ -31,7 +31,7 @@ export function ConnectionsSettings() {
   const providers = useQuery(providersQuery);
   const [toast, setToast] = useState<string>();
 
-  if (connections.isPending || providers.isPending) return <p className="text-muted">Loading keys…</p>;
+  if (connections.isPending || providers.isPending) return <p className="mono mu text-center text-[11px]">Loading keys…</p>;
   if (connections.isError || providers.isError) {
     return <p role="alert">Minstrel could not load your keys. Reload the page.</p>;
   }
@@ -39,18 +39,21 @@ export function ConnectionsSettings() {
   const musicProviders = providers.data.filter((p) => p.kind === 'music');
   const hasMusic = connections.data.some((c) => c.kind === 'music');
   const nameOf = (adapter: string) => providers.data.find((p) => p.adapter === adapter)?.displayName ?? adapter;
+  const sections = [
+    { kind: 'music', title: 'Music', note: 'makes the songs', text: 'Minstrel makes songs with these keys. Each provider charges your own account.' },
+    { kind: 'text', title: 'Text', note: 'writes the words', text: 'These keys write lyrics, styles and titles. Any OpenAI-compatible API works.' },
+  ] as const;
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
-      <section className="flex flex-col gap-6">
+    <div className="flex flex-wrap items-start gap-x-16 gap-y-14">
+      <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-14">
         {!hasMusic ? (
-          <div className="card flex flex-col gap-3">
-            <span className="card-pill">Start here</span>
-            <p>Add a music provider key to make songs.</p>
-            <ul aria-label="Music providers" className="flex flex-col gap-2">
+          <div className="card px-7 py-6">
+            <p className="m-0 text-[14px]">Add a music provider key to make songs.</p>
+            <ul aria-label="Music providers" className="m-0 flex list-none flex-wrap gap-2 p-0">
               {musicProviders.map((p) => (
                 <li key={p.adapter}>
-                  <a href={p.keyUrl} target="_blank" rel="noreferrer" className="underline">
+                  <a href={p.keyUrl} target="_blank" rel="noreferrer" className="pill gl min-h-9 px-4 text-[12px]">
                     Get a {p.displayName} key
                   </a>
                 </li>
@@ -58,18 +61,33 @@ export function ConnectionsSettings() {
             </ul>
           </div>
         ) : null}
-        {connections.data.length > 0 ? (
-          <div className="card">
-            <span className="card-pill">Your keys</span>
-            <ul className="flex flex-col divide-y divide-bg">
-              {connections.data.map((c) => (
-                <ConnectionRow key={c.id} connection={c} providerName={nameOf(c.adapter)} />
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </section>
-      <section className="flex flex-col gap-3">
+        {sections.map((section) => {
+          const keys = connections.data.filter((c) => c.kind === section.kind);
+          return (
+            <section key={section.kind} aria-labelledby={`keys-${section.kind}`}>
+              <div className="flex items-baseline justify-between gap-4">
+                <h2 id={`keys-${section.kind}`} className="m-0 text-[11px] font-semibold uppercase">
+                  {section.title}
+                </h2>
+                <span className="mono mu text-[11px]">{section.note}</span>
+              </div>
+              <p className="mu mt-1.5 mb-[18px]">{section.text}</p>
+              {keys.length > 0 ? (
+                <ul className="m-0 list-none p-0">
+                  {keys.map((c) => (
+                    <ConnectionRow key={c.id} connection={c} providerName={nameOf(c.adapter)} />
+                  ))}
+                </ul>
+              ) : (
+                <p className="mono mu m-0 border-y border-dotted border-black/10 px-3.5 py-4 text-[11px]">
+                  No {section.title.toLowerCase()} key yet. Add one in the form.
+                </p>
+              )}
+            </section>
+          );
+        })}
+      </div>
+      <div className="flex min-w-0 flex-[1_1_340px] flex-col gap-3">
         <AddConnectionForm
           providers={providers.data}
           onAdded={() => {
@@ -77,10 +95,10 @@ export function ConnectionsSettings() {
             void queryClient.invalidateQueries({ queryKey: connectionsQuery.queryKey });
           }}
         />
-        <p role="status" aria-live="polite" className="min-h-6">
+        <p role="status" aria-live="polite" className="mono m-0 min-h-[18px] text-center text-[11px]">
           {toast}
         </p>
-      </section>
+      </div>
     </div>
   );
 }
@@ -99,41 +117,54 @@ function ConnectionRow({ connection, providerName }: { connection: ConnectionDto
   // The UI never shows a key again (spec §7.1), so a remove asks first, as the Library delete does.
   const [confirming, setConfirming] = useState(false);
   const labelId = `connection-${connection.id}`;
+  const works = connection.status === 'ok';
 
   return (
-    <li aria-labelledby={labelId} className="flex flex-wrap items-center gap-3 py-3">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span id={labelId}>{connection.label}</span>
-        <span className="type-label text-muted">
-          {providerName} · <span className="tabular">•••• {connection.keyLast4}</span> ·{' '}
-          {STATUS_TEXT[connection.status]}
+    <li aria-labelledby={labelId} className="rel">
+      <div className="relative z-[1] flex flex-wrap items-center gap-x-5 gap-y-2.5 px-3.5 py-4">
+        <span className="art mono flex size-10 items-center justify-center bg-ink text-[15px] text-white uppercase" aria-hidden="true">
+          {providerName.slice(0, 1)}
         </span>
-      </div>
-      {confirming ? (
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="text-sm">Remove this key? Songs in progress with this key will fail.</span>
-          <button type="button" className="btn btn-soft" disabled={remove.isPending} onClick={() => remove.mutate()}>
-            Yes, remove
-          </button>
-          <button type="button" className="btn btn-text" onClick={() => setConfirming(false)}>
-            Cancel
-          </button>
-          {remove.isError ? (
-            <span role="alert" className="text-sm">
-              Minstrel could not remove this key. Try again.
+        <div className="flex min-w-0 flex-[1_1_240px] flex-col gap-1">
+          <span id={labelId} className="font-semibold uppercase">
+            {connection.label}
+          </span>
+          <span className="mu text-[11px] font-medium uppercase">
+            {providerName} · <span className="tabular">•••• {connection.keyLast4}</span>
+          </span>
+        </div>
+        {confirming ? (
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-[13px]">Remove this key? Songs in progress with this key will fail.</span>
+            <button type="button" className="pill dark min-h-9 px-4 text-[11px]" disabled={remove.isPending} onClick={() => remove.mutate()}>
+              Yes, remove
+            </button>
+            <button type="button" className="pill gl min-h-9 px-4 text-[11px]" onClick={() => setConfirming(false)}>
+              Cancel
+            </button>
+            {remove.isError ? (
+              <span role="alert" className="text-[12px] font-semibold">
+                Minstrel could not remove this key. Try again.
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <>
+            <span className="mono inline-flex min-w-[140px] items-center gap-2 text-[11px]">
+              <span aria-hidden="true" className={`size-1.5 rounded-full ${works ? 'bg-ink' : 'border border-ink'}`} />
+              {STATUS_TEXT[connection.status]}
             </span>
-          ) : null}
-        </span>
-      ) : (
-        <>
-          <button type="button" className="btn btn-soft" disabled={test.isPending} onClick={() => test.mutate()}>
-            Test key
-          </button>
-          <button type="button" className="btn btn-text" onClick={() => setConfirming(true)}>
-            Remove
-          </button>
-        </>
-      )}
+            <span className="flex gap-1.5">
+              <button type="button" className="pill gl mono min-h-9 px-4 text-[11px] font-normal" disabled={test.isPending} onClick={() => test.mutate()}>
+                {test.isPending ? 'Testing…' : 'Test key'}
+              </button>
+              <button type="button" className="pill gl mono min-h-9 px-4 text-[11px] font-normal" onClick={() => setConfirming(true)}>
+                Remove
+              </button>
+            </span>
+          </>
+        )}
+      </div>
     </li>
   );
 }

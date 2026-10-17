@@ -39,19 +39,19 @@ export function DeleteAccount() {
 
   if (!confirming) {
     return (
-      <button type="button" className="btn btn-soft self-start" onClick={() => setConfirming(true)}>
+      <button type="button" className="pill gl" onClick={() => setConfirming(true)}>
         Delete account
       </button>
     );
   }
 
   return (
-    <form onSubmit={onConfirm} className="flex flex-col gap-4" noValidate>
-      <p>
+    <form onSubmit={onConfirm} className="flex basis-full flex-col gap-4" noValidate>
+      <p className="m-0">
         This deletes your songs, your keys, and your account. You cannot undo it.
       </p>
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor={inputId} className="type-label text-muted">
+      <div className="flex flex-col gap-2">
+        <label htmlFor={inputId} className="lbl">
           Password
         </label>
         <input
@@ -59,24 +59,24 @@ export function DeleteAccount() {
           name="password"
           type="password"
           autoComplete="current-password"
-          className="field"
+          className="in max-w-sm"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${hintId} ${errorId}` : hintId}
         />
-        <span id={hintId} className="text-muted text-sm">
+        <span id={hintId} className="hint">
           Leave it empty if you sign in with Google.
         </span>
       </div>
       {error ? (
-        <p id={errorId} role="alert" className="text-sm">
+        <p id={errorId} role="alert" className="m-0 pl-5 text-[12px] font-semibold">
           {error}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-3">
-        <button type="submit" className="btn btn-primary" disabled={busy}>
+        <button type="submit" className="pill dark" disabled={busy}>
           Yes, delete my account
         </button>
-        <button type="button" className="btn btn-text" onClick={() => setConfirming(false)}>
+        <button type="button" className="pill gl" onClick={() => setConfirming(false)}>
           Cancel
         </button>
       </div>
