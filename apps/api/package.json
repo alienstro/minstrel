@@ -22,7 +22,8 @@
     "dev": "nest start --watch",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "keys:rotate": "nest build && node dist/scripts/rotate-keys.js"
   },
   "dependencies": {
     "@minstrel/shared": "workspace:*",
