@@ -1,5 +1,5 @@
 import type { ConnectionDto, GenerationDto, ProviderInfo } from '@minstrel/shared';
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fakeApi, renderWithQuery } from '@/test/render';
 import { SongForm } from './song-form';
@@ -34,11 +34,15 @@ const connection = (id: string, adapter: ConnectionDto['adapter'], label: string
 const connections = [
   connection('c-kie', 'kie', 'kie.ai'),
   connection('c-el', 'elevenlabs', 'ElevenLabs'),
-  connection('c-text', 'openai_compatible', 'OpenRouter'),
+  { ...connection('c-text', 'openai_compatible', 'OpenRouter'), defaultModel: 'openai/gpt-5-mini' },
 ];
 const models = {
   'c-kie': [{ id: 'V6', label: 'V6' }],
   'c-el': [{ id: 'music_v2_5', label: 'Music v2.5' }],
+  'c-text': [
+    { id: 'openai/gpt-5-mini', label: 'GPT-5 Mini' },
+    { id: 'meta-llama/llama-4', label: 'Llama 4' },
+  ],
 };
 
 const generation = { id: 'g1', status: 'pending', tracks: [] } as unknown as GenerationDto;
@@ -140,6 +144,31 @@ describe('SongForm', () => {
     });
   });
 
+  it('the Model picker lists only music models, and the Helper model picker lists only text models', async () => {
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: /^model/i }));
+    const music = within(screen.getByRole('listbox', { name: 'Models' }));
+    // V6 can also show in the Recent group, so there can be more than one match.
+    expect(music.getAllByRole('option', { name: /V6/ }).length).toBeGreaterThan(0);
+    expect(music.queryByRole('option', { name: /GPT-5 Mini/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /^helper model/i }));
+    const text = within(screen.getByRole('listbox', { name: 'Models' }));
+    expect(text.getByRole('option', { name: /GPT-5 Mini/ })).toBeInTheDocument();
+    expect(text.queryByRole('option', { name: /V6/ })).toBeNull();
+  });
+
+  it('Write lyrics sends the model picked in the Helper model picker', async () => {
+    const api = fakeApi({ 'POST /api/assist': { text: '[Verse]\nThe cat set sail' } });
+    renderForm();
+    await userEvent.click(screen.getByRole('button', { name: /^helper model/i }));
+    // The connection's default is GPT-5 Mini, so this pick must replace it.
+    await userEvent.click(screen.getByRole('option', { name: /Llama 4/ }));
+    await userEvent.type(screen.getByLabelText('What is the song about?'), 'a sea shanty about a lost cat');
+    await userEvent.click(screen.getByRole('button', { name: 'Write lyrics' }));
+    await vi.waitFor(() => expect(api.calls).toHaveLength(1));
+    expect(api.calls[0]!.body).toMatchObject({ connectionId: 'c-text', model: 'meta-llama/llama-4', task: 'lyrics' });
+  });
+
   it('Write lyrics fills the lyrics from the assist result', async () => {
     const api = fakeApi({ 'POST /api/assist': { text: '[Verse]\nThe cat set sail' } });
     renderForm();
@@ -147,6 +176,11 @@ describe('SongForm', () => {
     await userEvent.type(screen.getByLabelText('What is the song about?'), 'a sea shanty about a lost cat');
     await userEvent.click(screen.getByRole('button', { name: 'Write lyrics' }));
     await vi.waitFor(() => expect(screen.getByLabelText('Lyrics')).toHaveValue('[Verse]\nThe cat set sail'));
-    expect(api.calls[0]!.body).toMatchObject({ connectionId: 'c-text', task: 'lyrics', idea: 'a sea shanty about a lost cat' });
+    expect(api.calls[0]!.body).toMatchObject({
+      connectionId: 'c-text',
+      model: 'openai/gpt-5-mini',
+      task: 'lyrics',
+      idea: 'a sea shanty about a lost cat',
+    });
   });
 });

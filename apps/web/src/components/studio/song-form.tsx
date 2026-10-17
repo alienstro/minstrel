@@ -15,7 +15,7 @@ import { useMutation } from '@tanstack/react-query';
 import { type CSSProperties, type FormEvent, useRef, useState } from 'react';
 import { FieldError } from '@/components/ui/text-field';
 import { ApiClientError, apiFetch } from '@/lib/api';
-import { type ModelGroup, ModelPicker, type ModelValue } from './model-picker';
+import { HELPER_RECENT_KEY, type ModelGroup, ModelPicker, type ModelValue } from './model-picker';
 
 interface Props {
   connections: ConnectionDto[];
@@ -41,7 +41,15 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     models: models[c.id] ?? [],
   }));
 
+  // The helpers (Write lyrics, Suggest) use a text model, so they have their own picker.
+  const helperGroups: ModelGroup[] = textConnection
+    ? [{ connectionId: textConnection.id, connectionLabel: textConnection.label, models: models[textConnection.id] ?? [] }]
+    : [];
+
   const [model, setModel] = useState<ModelValue | null>(() => firstModel(groups));
+  const [helperModel, setHelperModel] = useState<ModelValue | null>(() =>
+    textConnection?.defaultModel ? { connectionId: textConnection.id, modelId: textConnection.defaultModel } : null,
+  );
   const [idea, setIdea] = useState('');
   const [lyrics, setLyrics] = useState('');
   const [style, setStyle] = useState('');
@@ -95,10 +103,12 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   async function help(task: Task, fill: (text: string) => void) {
     if (!textConnection) return;
     if (!idea.trim()) return setErrors({ idea: 'Describe the song first.' });
+    if (!helperModel) return setErrors({ helperModel: 'Choose a helper model.' });
     setErrors({});
     try {
       const result = await assist.mutateAsync({
         connectionId: textConnection.id,
+        model: helperModel.modelId,
         task,
         idea,
         fields: { lyrics, style, title },
@@ -148,6 +158,26 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
           </label>
         ) : null}
       </div>
+
+      {textConnection ? (
+        <div className="min-w-0 max-w-[440px]">
+          <ModelPicker
+            groups={helperGroups}
+            value={helperModel}
+            onPick={setHelperModel}
+            label="Helper model"
+            recentKey={HELPER_RECENT_KEY}
+            errorId={errors.helperModel ? 'song-helper-model-error' : undefined}
+          />
+          <div className="mt-2 pl-5">
+            {errors.helperModel ? (
+              <FieldError id="song-helper-model-error">{errors.helperModel}</FieldError>
+            ) : (
+              <p className="hint">Write lyrics and Suggest use this text model.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {range ? (
         <div className="flex flex-col gap-2">

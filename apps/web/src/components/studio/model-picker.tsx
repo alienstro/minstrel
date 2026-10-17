@@ -21,22 +21,23 @@ interface Entry extends ModelValue {
 }
 
 export const RECENT_KEY = 'minstrel.recentModels';
+export const HELPER_RECENT_KEY = 'minstrel.recentHelperModels';
 const RECENT_SIZE = 3;
 
 // localStorage can be missing or blocked. The picker then works without the Recent group.
-function readRecent(): ModelValue[] {
+function readRecent(key: string): ModelValue[] {
   try {
-    const value = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]');
+    const value = JSON.parse(localStorage.getItem(key) ?? '[]');
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
 
-function saveRecent(pick: ModelValue) {
+function saveRecent(key: string, pick: ModelValue) {
   try {
-    const rest = readRecent().filter((r) => r.connectionId !== pick.connectionId || r.modelId !== pick.modelId);
-    localStorage.setItem(RECENT_KEY, JSON.stringify([pick, ...rest].slice(0, RECENT_SIZE)));
+    const rest = readRecent(key).filter((r) => r.connectionId !== pick.connectionId || r.modelId !== pick.modelId);
+    localStorage.setItem(key, JSON.stringify([pick, ...rest].slice(0, RECENT_SIZE)));
   } catch {
     // Recent is a convenience. A storage failure changes nothing else.
   }
@@ -50,10 +51,16 @@ export function ModelPicker({
   value,
   onPick,
   errorId,
+  label = 'Model',
+  recentKey = RECENT_KEY,
 }: {
   groups: ModelGroup[];
   value: ModelValue | null;
   onPick: (value: ModelValue) => void;
+  /** The visible name of the picker. Each picker on a page needs its own name. */
+  label?: string;
+  /** The localStorage key of the Recent group, so that each picker keeps its own Recent list. */
+  recentKey?: string;
   /** The ID of the error text below the picker, when the model has an error (spec §10.3). */
   errorId?: string;
 }) {
@@ -101,7 +108,7 @@ export function ModelPicker({
   }, [isOpen]);
 
   function openPanel() {
-    setRecent(readRecent());
+    setRecent(readRecent(recentKey));
     setQuery('');
     setActive(-1);
     setIsOpen(true);
@@ -114,7 +121,7 @@ export function ModelPicker({
 
   function pick(entry: Entry) {
     const choice = { connectionId: entry.connectionId, modelId: entry.modelId };
-    saveRecent(choice);
+    saveRecent(recentKey, choice);
     onPick(choice);
     close();
   }
@@ -173,7 +180,7 @@ export function ModelPicker({
   return (
     <div ref={containerRef} className="relative flex min-w-0 flex-col gap-2">
       <span id={`${baseId}-label`} className="lbl">
-        Model
+        {label}
       </span>
       <button
         ref={triggerRef}
