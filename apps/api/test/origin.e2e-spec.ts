@@ -73,6 +73,14 @@ describe('origin guard (e2e)', () => {
     expect(res.body.code).toBe('unsupported_media_type');
   });
 
+  it('a POST with no body passes', async () => {
+    const res = await request(t.app.getHttpServer())
+      .post('/api/probe')
+      .set('Origin', TEST_ORIGIN)
+      .set('Content-Length', '0');
+    expect(res.status).toBe(200);
+  });
+
   it('a webhook POST without Origin passes the guard', async () => {
     const res = await request(t.app.getHttpServer())
       .post('/api/webhooks/probe')

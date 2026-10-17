@@ -1,4 +1,8 @@
-import { type CanActivate, type ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  type CanActivate,
+  type ExecutionContext,
+  Injectable,
+} from '@nestjs/common';
 import type { Request } from 'express';
 import { ApiError } from './api-error.js';
 
@@ -13,16 +17,33 @@ export class OriginGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<Request>();
-    if (!MUTATING.has(request.method) || EXEMPT.some((prefix) => request.path.startsWith(prefix))) {
+    if (
+      !MUTATING.has(request.method) ||
+      EXEMPT.some((prefix) => request.path.startsWith(prefix))
+    ) {
       return true;
     }
     if (!this.webOrigin || request.headers.origin !== this.webOrigin) {
-      throw new ApiError(403, 'forbidden', 'This request did not come from Minstrel.');
+      throw new ApiError(
+        403,
+        'forbidden',
+        'This request did not come from Minstrel.',
+      );
     }
-    // req.is() gives null when the request has no body, and false when the body is not JSON.
-    if (request.is('application/json') === false) {
-      throw new ApiError(415, 'unsupported_media_type', 'Send the request body as JSON.');
+    if (hasBody(request) && !request.is('application/json')) {
+      throw new ApiError(
+        415,
+        'unsupported_media_type',
+        'Send the request body as JSON.',
+      );
     }
     return true;
   }
+}
+
+// A browser sends Content-Length: 0 for a POST without a body. That request has no body to check.
+function hasBody(request: Request): boolean {
+  if (request.headers['transfer-encoding'] !== undefined) return true;
+  const length = Number(request.headers['content-length'] ?? 0);
+  return Number.isFinite(length) && length > 0;
 }
