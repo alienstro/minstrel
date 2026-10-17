@@ -2,68 +2,65 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthForm } from './auth-form';
 
-const auth = vi.hoisted(() => ({
-  signUpEmail: vi.fn(),
-  signInEmail: vi.fn(),
-  signInSocial: vi.fn(),
-}));
+const auth = vi.hoisted(() => ({ signInSocial: vi.fn() }));
+const search = vi.hoisted(() => ({ params: new URLSearchParams() }));
 
 vi.mock('@/lib/auth-client', () => ({
-  authClient: {
-    signUp: { email: auth.signUpEmail },
-    signIn: { email: auth.signInEmail, social: auth.signInSocial },
-  },
+  authClient: { signIn: { social: auth.signInSocial } },
 }));
 
-const push = vi.fn();
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
+vi.mock('next/navigation', () => ({ useSearchParams: () => search.params }));
 
 describe('AuthForm', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    search.params = new URLSearchParams();
   });
 
-  it('sign-up shows the check-your-email message after success', async () => {
-    auth.signUpEmail.mockResolvedValue({ data: { user: { id: 'u1' } }, error: null });
-    render(<AuthForm mode="sign-up" />);
-    await userEvent.type(screen.getByLabelText('Name'), 'Ada');
-    await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'correct horse battery');
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }));
-    expect(auth.signUpEmail).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Ada', email: 'ada@example.com', password: 'correct horse battery' }),
+  it('the form has no email or password field, only the Google button', () => {
+    render(<AuthForm />);
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByLabelText(/password/i)).toBeNull();
+    expect(screen.getAllByRole('button').map((b) => b.textContent)).toEqual(['Continue with Google']);
+  });
+
+  it('Continue with Google starts the Google sign-in to the studio', async () => {
+    auth.signInSocial.mockResolvedValue({ data: {}, error: null });
+    render(<AuthForm />);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue with Google' }));
+    expect(auth.signInSocial).toHaveBeenCalledWith({
+      provider: 'google',
+      callbackURL: '/studio',
+      errorCallbackURL: '/sign-in',
+    });
+  });
+
+  it('a Google sign-in that does not start shows the error and enables the button again', async () => {
+    auth.signInSocial.mockResolvedValue({ data: null, error: { status: 500, message: 'Server error' } });
+    render(<AuthForm />);
+    const button = screen.getByRole('button', { name: 'Continue with Google' });
+    await userEvent.click(button);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Minstrel could not open Google. Try again.');
+    expect(button).toBeEnabled();
+  });
+
+  it('an account_not_linked error in the URL tells the user which account to use', () => {
+    search.params = new URLSearchParams('error=account_not_linked');
+    render(<AuthForm />);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Minstrel cannot link this Google account. Use the Google account with the email of your Minstrel account.',
     );
-    expect(await screen.findByRole('status')).toHaveTextContent('Check your email');
-    expect(screen.getByRole('status')).toHaveTextContent('ada@example.com');
   });
 
-  it('a field error sits next to its field with aria-describedby', async () => {
-    render(<AuthForm mode="sign-up" />);
-    await userEvent.type(screen.getByLabelText('Name'), 'Ada');
-    await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'short');
-    await userEvent.click(screen.getByRole('button', { name: /create account/i }));
-    const password = screen.getByLabelText('Password');
-    expect(password).toHaveAttribute('aria-invalid', 'true');
-    const errorId = password.getAttribute('aria-describedby')!;
-    expect(document.getElementById(errorId)).toHaveTextContent('at least 8 characters');
-    expect(auth.signUpEmail).not.toHaveBeenCalled();
+  it('another error in the URL asks the user to try again', () => {
+    search.params = new URLSearchParams('error=state_mismatch');
+    render(<AuthForm />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Google sign-in did not finish. Try again.');
   });
 
-  it('a sign-in error from the server shows its message', async () => {
-    auth.signInEmail.mockResolvedValue({ data: null, error: { status: 401, message: 'Invalid email or password' } });
-    render(<AuthForm mode="sign-in" />);
-    await userEvent.type(screen.getByLabelText('Email'), 'ada@example.com');
-    await userEvent.type(screen.getByLabelText('Password'), 'correct horse battery');
-    await userEvent.click(screen.getByRole('button', { name: /sign in/i }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it('the Google button starts the Google sign-in', async () => {
-    auth.signInSocial.mockResolvedValue({ data: null, error: null });
-    render(<AuthForm mode="sign-in" />);
-    await userEvent.click(screen.getByRole('button', { name: /continue with google/i }));
-    expect(auth.signInSocial).toHaveBeenCalledWith({ provider: 'google', callbackURL: '/studio' });
+  it('the note links to the Terms and the Privacy notice', () => {
+    render(<AuthForm />);
+    expect(screen.getByRole('link', { name: 'Terms' })).toHaveAttribute('href', '/terms');
+    expect(screen.getByRole('link', { name: 'Privacy notice' })).toHaveAttribute('href', '/privacy');
   });
 });

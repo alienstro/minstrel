@@ -28,7 +28,6 @@ describe('GET /api/generations (e2e)', () => {
         userId: ada.userId,
         connectionId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         providerTaskId: `task-${randomUUID()}`,
         input: { idea: 'a song', instrumental: false, model: 'V5' },

@@ -8,7 +8,7 @@ export interface SunoMode {
   title: string;
 }
 
-// kie.ai and sunoapi.org both run Suno. Custom mode sings the given lyrics, or makes an instrumental in
+// kie.ai runs Suno. Custom mode sings the given lyrics, or makes an instrumental in
 // the given style. Without lyrics, the non-custom mode writes lyrics from the idea.
 export function sunoMode(input: GenerationInput): SunoMode {
   const lyrics = input.instrumental ? undefined : input.lyrics?.trim() || undefined;

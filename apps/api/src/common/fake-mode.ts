@@ -1,7 +1,7 @@
 type Env = Record<string, string | undefined>;
 
 /**
- * MINSTREL_FAKE_PROVIDERS=1 runs the API with a fake kie provider and no email, for the local
+ * MINSTREL_FAKE_PROVIDERS=1 runs the API with a fake kie provider and a password sign-up, for the local
  * end-to-end test (plan Task 51). A fake provider in production would give users fake songs, so the
  * API refuses to start with the flag there.
  */

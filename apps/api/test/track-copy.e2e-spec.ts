@@ -73,7 +73,6 @@ describe('TrackCopier (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'first_ready',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
       })

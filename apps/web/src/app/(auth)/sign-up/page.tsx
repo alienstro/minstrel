@@ -1,8 +1,6 @@
-import type { Metadata } from 'next';
-import { AuthForm } from '@/components/auth/auth-form';
+import { permanentRedirect } from 'next/navigation';
 
-export const metadata: Metadata = { title: 'Create account · Minstrel' };
-
+// Google sign-in also makes the account, so the old sign-up link goes to the sign-in page.
 export default function SignUpPage() {
-  return <AuthForm mode="sign-up" />;
+  permanentRedirect('/sign-in');
 }

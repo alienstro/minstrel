@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { AccountEmail } from '@/components/account/account-email';
 import { DeleteAccount } from '@/components/account/delete-account';
@@ -21,7 +20,7 @@ function Row({ title, text, children }: { title: string; text: ReactNode; childr
   );
 }
 
-// The Account artboard. Spec §10.1: email, password, sign out, and account deletion.
+// The Account artboard. Spec §10.1: email, sign out, and account deletion.
 export default function AccountPage() {
   return (
     <div className="flex flex-col">
@@ -37,11 +36,6 @@ export default function AccountPage() {
           <ul className="m-0 list-none p-0">
             <Row title="Email" text={<AccountEmail />}>
               {null}
-            </Row>
-            <Row title="Password" text={<span className="mu">To change your password, get a reset link by email.</span>}>
-              <Link href="/forgot-password" className="pill gl">
-                Reset password
-              </Link>
             </Row>
             <Row title="Sign out" text={<span className="mu">Sign out on this device.</span>}>
               <SignOutButton />

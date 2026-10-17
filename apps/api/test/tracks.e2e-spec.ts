@@ -27,7 +27,6 @@ describe('/api/tracks routes (e2e)', () => {
       .values({
         userId: ada.userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'complete',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
       })

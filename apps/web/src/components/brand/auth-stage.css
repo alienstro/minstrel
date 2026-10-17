@@ -1,5 +1,5 @@
 /* Plain CSS with an auth- prefix: next.config.ts runs each .css file as global CSS.
-   The SignIn, SignUp and ForgotPassword artboards: photo columns, a ring of covers, a record sleeve. */
+   The SignIn artboard: photo columns, a ring of covers, a record sleeve. */
 .auth-stage {
   position: relative;
   min-height: max(100dvh, 820px);

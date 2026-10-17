@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Logo } from '@/components/brand/logo';
 import { connectionsQuery, providersQuery } from '@/components/connections/connection-list';
 import { usePlayer } from '@/components/player/player-context';
-import { isFinished } from '@/hooks/use-generation';
+import { generationQueryOptions, isFinished } from '@/hooks/use-generation';
 import { apiFetch } from '@/lib/api';
 import { SongForm } from './song-form';
 import { TakesPanel } from './takes-panel';
@@ -36,8 +36,10 @@ export function StudioView() {
   const connections = useQuery(connectionsQuery);
   const providers = useQuery(providersQuery);
   const music = (connections.data ?? []).filter((c) => c.kind === 'music');
+  // Music models feed the Model picker. Text models feed the Helper model picker.
+  const withModels = connections.data ?? [];
   const modelQueries = useQueries({
-    queries: music.map((c) => ({
+    queries: withModels.map((c) => ({
       queryKey: ['models', c.id],
       queryFn: () => apiFetch<ModelOption[]>(`/api/connections/${c.id}/models`),
       staleTime: 5 * 60_000,
@@ -46,6 +48,10 @@ export function StudioView() {
   const recent = useQuery(recentGenerationsQuery);
   const [created, setCreated] = useState<GenerationDto[]>([]);
   const { playing } = usePlayer();
+  const takes = takesToShow(created, recent.data?.items ?? []);
+  // The count reads the same polled rows as the Takes panel, so it grows as the takes arrive.
+  const live = useQueries({ queries: takes.map((g) => generationQueryOptions(g.id, g)) });
+  const trackCount = takes.reduce((n, g, i) => n + (live[i]?.data ?? g).tracks.length, 0);
 
   if (connections.isPending || providers.isPending || modelQueries.some((q) => q.isPending)) {
     return <p className="mono mu text-center text-[11px]">Loading…</p>;
@@ -64,9 +70,7 @@ export function StudioView() {
     );
   }
 
-  const models = Object.fromEntries(music.map((c, i) => [c.id, modelQueries[i]?.data ?? []]));
-  const takes = takesToShow(created, recent.data?.items ?? []);
-  const trackCount = takes.reduce((n, g) => n + g.tracks.length, 0);
+  const models = Object.fromEntries(withModels.map((c, i) => [c.id, modelQueries[i]?.data ?? []]));
   return (
     <div className="flex flex-wrap items-start gap-x-16 gap-y-14">
       <div className="min-w-0 flex-[999_1_560px]">

@@ -1,162 +1,115 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { type FormEvent, useId, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { AuthStage } from '@/components/brand/auth-stage';
 import { FieldError } from '@/components/ui/text-field';
 import { authClient } from '@/lib/auth-client';
-import { AuthField, AuthFieldErrors } from './auth-field';
-
-type Mode = 'sign-in' | 'sign-up';
-type Fields = Partial<Record<'name' | 'email' | 'password', string>>;
+import './auth-form.css';
 
 const AFTER_SIGN_IN = '/studio';
-const MIN_PASSWORD = 8;
+const SIGN_IN = '/sign-in';
 
-function validate(mode: Mode, form: FormData): Fields {
-  const errors: Fields = {};
-  if (mode === 'sign-up' && !String(form.get('name') ?? '').trim()) errors.name = 'Enter your name.';
-  if (!/^\S+@\S+\.\S+$/.test(String(form.get('email') ?? ''))) errors.email = 'Enter an email address.';
-  if (String(form.get('password') ?? '').length < MIN_PASSWORD) {
-    errors.password = `Use at least ${MIN_PASSWORD} characters.`;
+// Better Auth sends the user back to SIGN_IN with ?error=<code> when the Google sign-in fails.
+function messageFor(code: string | null): string | undefined {
+  if (!code) return undefined;
+  if (code === 'account_not_linked') {
+    return 'Minstrel cannot link this Google account. Use the Google account with the email of your Minstrel account.';
   }
-  return errors;
+  return 'Google sign-in did not finish. Try again.';
 }
 
-// The canvas text for each screen: the small label, the serif heading, and the two words on the star.
-const SCREEN = {
-  'sign-in': { label: 'Welcome back to Minstrel', heading: 'Sign in', star: ['WELCOME', 'BACK'], submit: 'Sign in' },
-  'sign-up': { label: 'New to Minstrel', heading: 'Make an account', star: ['FIRST', 'SONG'], submit: 'Create account' },
-} as const;
+function ErrorLine({ message }: { message: string }) {
+  return (
+    <div role="alert">
+      <FieldError id="auth-form-error">{message}</FieldError>
+    </div>
+  );
+}
 
+// Only this line reads the URL, so the Suspense boundary around it lets the rest of the page prerender.
+function UrlError() {
+  const message = messageFor(useSearchParams().get('error'));
+  return message ? <ErrorLine message={message} /> : null;
+}
+
+// Google's standard "G" mark. Its four colors must stay as they are (Google sign-in branding rules).
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true" focusable="false">
+      <path
+        fill="#EA4335"
+        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+      />
+      <path
+        fill="#4285F4"
+        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+      />
+      <path
+        fill="#34A853"
+        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+      />
+    </svg>
+  );
+}
+
+// Spec §7.2: Google is the only sign-in. One button signs in a user, or makes the account of a new user.
 // `bare` drops the stage, for a form inside another page such as Home.
-export function AuthForm({ mode, bare = false }: { mode: Mode; bare?: boolean }) {
-  const router = useRouter();
-  const ids = useId();
-  const [fields, setFields] = useState<Fields>({});
-  const [formError, setFormError] = useState<string>();
-  const [sentTo, setSentTo] = useState<string>();
+export function AuthForm({ bare = false }: { bare?: boolean }) {
+  const [startError, setStartError] = useState<string>();
   const [busy, setBusy] = useState(false);
 
-  async function onSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const errors = validate(mode, form);
-    setFields(errors);
-    setFormError(undefined);
-    if (Object.keys(errors).length > 0) return;
-
-    const email = String(form.get('email'));
-    const password = String(form.get('password'));
+  async function onGoogle() {
     setBusy(true);
-    try {
-      if (mode === 'sign-up') {
-        const name = String(form.get('name')).trim();
-        const { error } = await authClient.signUp.email({ name, email, password, callbackURL: AFTER_SIGN_IN });
-        if (error) return setFormError(error.message ?? 'Minstrel could not create the account. Try again.');
-        setSentTo(email);
-      } else {
-        const { error } = await authClient.signIn.email({ email, password, callbackURL: AFTER_SIGN_IN });
-        if (error?.status === 403) return setFormError('Confirm your email first. Open the link that we sent you.');
-        if (error) return setFormError(error.message ?? 'Minstrel could not sign you in. Try again.');
-        router.push(AFTER_SIGN_IN);
-      }
-    } finally {
+    setStartError(undefined);
+    // On success the browser goes to Google, so the button stays busy.
+    const { error: failed } = await authClient.signIn.social({
+      provider: 'google',
+      callbackURL: AFTER_SIGN_IN,
+      errorCallbackURL: SIGN_IN,
+    });
+    if (failed) {
+      setStartError('Minstrel could not open Google. Try again.');
       setBusy(false);
     }
   }
 
-  const isSignUp = mode === 'sign-up';
-  const screen = SCREEN[mode];
-
-  if (sentTo) {
-    return (
-      <AuthStage label="Check your email" heading="Link sent" starText={['FIRST', 'SONG']}>
-        <div className="card" style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', padding: '12px 24px' }}>
-          <p role="status" className="m-0 text-[14px]">
-            Check your email. We sent a link to <strong>{sentTo}</strong>. Open it to start Minstrel.
-          </p>
-        </div>
-      </AuthStage>
-    );
-  }
-
-  const nameId = `${ids}-name`;
-  const emailId = `${ids}-email`;
-  const passwordId = `${ids}-password`;
   const form = (
-      <form noValidate onSubmit={onSubmit} aria-label={screen.heading} className="flex flex-col items-center gap-3.5">
-        <div className="card w-full">
-          <div className="flex w-full flex-wrap items-center gap-2">
-            {isSignUp ? <AuthField id={nameId} label="Name" name="name" autoComplete="name" error={fields.name} /> : null}
-            <AuthField id={emailId} label="Email" name="email" type="email" autoComplete="email" error={fields.email} />
-            <AuthField
-              id={passwordId}
-              label="Password"
-              name="password"
-              type="password"
-              autoComplete={isSignUp ? 'new-password' : 'current-password'}
-              placeholder={isSignUp ? `Password, ${MIN_PASSWORD} or more characters` : 'Password'}
-              error={fields.password}
-            />
-            <button type="submit" className="pill dark" style={{ flex: '0 0 auto' }} disabled={busy}>
-              {screen.submit} <span aria-hidden="true">→</span>
-            </button>
-          </div>
-        </div>
-        <AuthFieldErrors
-          errors={[
-            { id: nameId, message: fields.name },
-            { id: emailId, message: fields.email },
-            { id: passwordId, message: fields.password },
-          ]}
-        />
-        {formError ? (
-          <div role="alert">
-            <FieldError id="auth-form-error">{formError}</FieldError>
-          </div>
-        ) : null}
-        <button
-          type="button"
-          className="pill gl"
-          onClick={() => authClient.signIn.social({ provider: 'google', callbackURL: AFTER_SIGN_IN })}
-        >
-          Continue with Google
-        </button>
-        <p className="mono mu m-0 text-center text-[11px]">
-          {isSignUp ? (
-            <>
-              When you continue, you agree to the{' '}
-              <Link href="/terms" className="dotted">
-                Terms
-              </Link>{' '}
-              and the{' '}
-              <Link href="/privacy" className="dotted">
-                Privacy notice
-              </Link>{' '}
-              · Have an account?{' '}
-              <Link href="/sign-in" className="dotted text-ink">
-                Sign in
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/forgot-password" className="dotted">
-                Forgot password
-              </Link>{' '}
-              · New here?{' '}
-              <Link href="/sign-up" className="dotted text-ink">
-                Make an account
-              </Link>
-            </>
-          )}
-        </p>
-      </form>
+    <div className="auth-google">
+      <button type="button" className="record-btn" onClick={onGoogle} disabled={busy} aria-busy={busy}>
+        <span className="record-label">
+          <GoogleMark />
+        </span>
+        Continue with Google
+      </button>
+      {startError ? (
+        <ErrorLine message={startError} />
+      ) : (
+        <Suspense>
+          <UrlError />
+        </Suspense>
+      )}
+      <p className="mono mu auth-note">
+        New to Minstrel? The same button makes your account. When you continue, you agree to the{' '}
+        <Link href="/terms" className="dotted">
+          Terms
+        </Link>{' '}
+        and the{' '}
+        <Link href="/privacy" className="dotted">
+          Privacy notice
+        </Link>
+        .
+      </p>
+    </div>
   );
   if (bare) return form;
   return (
-    <AuthStage label={screen.label} heading={screen.heading} starText={[...screen.star] as [string, string]}>
+    <AuthStage label="Welcome to Minstrel" heading="Sign in" starText={['WELCOME', 'IN']}>
       {form}
     </AuthStage>
   );

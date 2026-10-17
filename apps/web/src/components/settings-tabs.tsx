@@ -11,7 +11,7 @@ const TABS = [
 export function SettingsTabs() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Settings" className="flex justify-end gap-1.5">
+    <nav aria-label="Settings" className="flex flex-1 justify-end gap-1.5">
       {TABS.map((tab) => {
         const current = pathname === tab.href;
         return (

@@ -12,9 +12,9 @@ const groups: ModelGroup[] = [
     ],
   },
   {
-    connectionId: 'el-1',
-    connectionLabel: 'ElevenLabs',
-    models: [{ id: 'music_v2_5', label: 'Music v2.5', note: 'Up to 180 s' }],
+    connectionId: 'kie-2',
+    connectionLabel: 'Second kie.ai',
+    models: [{ id: 'V5', label: 'V5', note: 'Older model' }],
   },
 ];
 
@@ -42,8 +42,8 @@ describe('ModelPicker', () => {
     await userEvent.type(search, 'mini');
     expect(optionNames()).toEqual([expect.stringContaining('V6 Mini')]);
     await userEvent.clear(search);
-    await userEvent.type(search, 'eleven');
-    expect(optionNames()).toEqual([expect.stringContaining('Music v2.5')]);
+    await userEvent.type(search, 'second');
+    expect(optionNames()).toEqual([expect.stringContaining('V5')]);
     await userEvent.clear(search);
     await userEvent.type(search, 'best quality');
     expect(optionNames()).toEqual([expect.stringContaining('V6')]);
@@ -70,7 +70,7 @@ describe('ModelPicker', () => {
     localStorage.setItem(
       RECENT_KEY,
       JSON.stringify([
-        { connectionId: 'el-1', modelId: 'music_v2_5' },
+        { connectionId: 'kie-2', modelId: 'V5' },
         { connectionId: 'kie-1', modelId: 'V6_MINI' },
         { connectionId: 'kie-1', modelId: 'V6' },
         { connectionId: 'gone', modelId: 'old' },
@@ -80,7 +80,7 @@ describe('ModelPicker', () => {
     await open();
     const recent = screen.getByRole('group', { name: 'Recent' });
     expect(within(recent).getAllByRole('option').map((o) => o.textContent)).toEqual([
-      expect.stringContaining('Music v2.5'),
+      expect.stringContaining('V5'),
       expect.stringContaining('V6 Mini'),
       expect.stringContaining('V6'),
     ]);

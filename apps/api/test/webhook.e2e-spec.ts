@@ -35,7 +35,6 @@ describe('POST /api/webhooks/:adapter/:generationId (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         providerTaskId: 'task-1',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
@@ -90,7 +89,7 @@ describe('POST /api/webhooks/:adapter/:generationId (e2e)', () => {
   });
 
   it('an adapter that does not match the row gives 404', async () => {
-    const res = await callback(`/api/webhooks/suno_classic/${id}?t=${TOKEN}`).send({});
+    const res = await callback(`/api/webhooks/openai_compatible/${id}?t=${TOKEN}`).send({});
 
     expect(res.status).toBe(404);
     expect(t.background.queue).toHaveLength(0);

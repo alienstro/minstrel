@@ -4,7 +4,7 @@ import type { ConnectionCheck, DecryptedConnection } from './types.js';
 
 const API_TIMEOUT_MS = 30_000;
 
-// kie.ai and sunoapi.org wrap each reply in { code, msg, data }. The HTTP status can be 200 when the
+// kie.ai wraps each reply in { code, msg, data }. The HTTP status can be 200 when the
 // request failed, so the `code` field decides.
 export async function callEnvelope<T>(
   fetch: SafeFetch,

@@ -4,6 +4,7 @@ import {
   type ModelOption,
   type MusicCapabilities,
 } from '@minstrel/shared';
+import { ApiError } from '../common/api-error.js';
 import {
   safeFetch as defaultSafeFetch,
   type SafeFetch,
@@ -13,7 +14,7 @@ import { sunoMode } from './suno-mode.js';
 import type {
   ConnectionCheck,
   DecryptedConnection,
-  JobMusicProvider,
+  MusicProvider,
   MusicTaskResult,
   ProviderTrack,
 } from './types.js';
@@ -26,12 +27,28 @@ interface KieTrack {
   duration?: number;
 }
 
+interface KieLyrics {
+  text?: string;
+  status?: 'complete' | 'failed';
+  error_message?: string;
+}
+
 interface KieRecord {
   state?: 'waiting' | 'queuing' | 'generating' | 'success' | 'fail';
-  response?: { data?: KieTrack[] } | null;
+  response?: { data?: KieTrack[]; lyricsData?: KieLyrics[] } | null;
   resultJson?: string | null;
   failMsg?: string | null;
 }
+
+// docs.kie.ai, Generate Lyrics: the prompt has at most 200 characters.
+const LYRICS_PROMPT_MAX = 200;
+const LYRICS_POLL_MS = 2_000;
+// The assist request must end well inside the 300 s function limit, also when each poll is slow.
+const LYRICS_TIMEOUT_MS = 60_000;
+// kie.ai continues the task and charges for it when one status check fails, so a short outage must
+// not end the request. A refused key or no credits stops at once, because a retry cannot fix them.
+const MAX_STATUS_RETRIES = 2;
+const RETRY_CODES = new Set(['provider_unavailable', 'provider_rate_limited']);
 
 const MODELS: ModelOption[] = [
   { id: 'V6', label: 'V6', note: 'Natural vocals and rich detail' },
@@ -40,9 +57,8 @@ const MODELS: ModelOption[] = [
 ];
 
 // Spec §5.1, from docs.kie.ai (Generate Music, Get Task Details), checked 2026-10-17.
-export class KieMusicProvider implements JobMusicProvider {
+export class KieMusicProvider implements MusicProvider {
   readonly adapter = 'kie' as const;
-  readonly flow = 'job' as const;
   readonly supportsCallback = true;
   readonly displayName = 'kie.ai';
   readonly defaultBaseUrl = 'https://api.kie.ai';
@@ -53,11 +69,19 @@ export class KieMusicProvider implements JobMusicProvider {
     style: true,
     providerTitle: true,
     instrumental: true,
-    lengthSeconds: null,
+    // kie.ai sends `duration` only in custom mode (see toKieInput).
+    lengthSeconds: { min: 10, max: 360 },
+    lengthAuto: true,
+    lengthNeedsCustomMode: true,
     tracksPerRequest: 2,
   };
 
-  constructor(private readonly fetch: SafeFetch = defaultSafeFetch) {}
+  constructor(
+    private readonly fetch: SafeFetch = defaultSafeFetch,
+    private readonly sleep: (ms: number) => Promise<void> = (ms) =>
+      new Promise((resolve) => setTimeout(resolve, ms)),
+    private readonly now: () => number = Date.now,
+  ) {}
 
   listModels(): ModelOption[] {
     return MODELS;
@@ -92,11 +116,7 @@ export class KieMusicProvider implements JobMusicProvider {
     conn: DecryptedConnection,
     taskId: string,
   ): Promise<MusicTaskResult> {
-    const record = await callEnvelope<KieRecord>(
-      this.fetch,
-      conn,
-      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
-    );
+    const record = await this.record(conn, taskId);
     if (record.state === 'fail') {
       return {
         state: 'failed',
@@ -107,6 +127,81 @@ export class KieMusicProvider implements JobMusicProvider {
     }
     if (record.state !== 'success') return { state: 'pending', tracks: [] };
     return { state: 'complete', tracks: tracksOf(record) };
+  }
+
+  /** Writes lyrics with kie.ai Generate Lyrics. It gives the first complete version. */
+  async writeLyrics(conn: DecryptedConnection, prompt: string): Promise<string> {
+    const { taskId } = await callEnvelope<{ taskId: string }>(
+      this.fetch,
+      conn,
+      '/api/v1/jobs/createTask',
+      {
+        method: 'POST',
+        body: {
+          model: 'ai-music-api/generate-lyrics',
+          input: { prompt: cutPrompt(prompt) },
+        },
+      },
+    );
+    const deadline = this.now() + LYRICS_TIMEOUT_MS;
+    let failures = 0;
+    while (this.now() + LYRICS_POLL_MS <= deadline) {
+      await this.sleep(LYRICS_POLL_MS);
+      let record: KieRecord;
+      try {
+        record = await this.record(conn, taskId);
+        failures = 0;
+      } catch (error) {
+        const retry = error instanceof ApiError && RETRY_CODES.has(error.code);
+        if (!retry || ++failures > MAX_STATUS_RETRIES) throw error;
+        continue;
+      }
+      if (record.state === 'fail') throw lyricsFailed(conn, record.failMsg);
+      if (record.state !== 'success') continue;
+      const versions = lyricsOf(record);
+      const done = versions.find((v) => v.status === 'complete' && v.text?.trim());
+      if (done) return done.text!;
+      throw lyricsFailed(conn, versions.find((v) => v.error_message)?.error_message);
+    }
+    throw new ApiError(
+      504,
+      'provider_timeout',
+      `${conn.label} did not finish the lyrics in time. Try again.`,
+    );
+  }
+
+  private record(conn: DecryptedConnection, taskId: string): Promise<KieRecord> {
+    return callEnvelope<KieRecord>(
+      this.fetch,
+      conn,
+      `/api/v1/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`,
+    );
+  }
+}
+
+// The cut must not split an emoji or another character that uses two UTF-16 units.
+function cutPrompt(prompt: string): string {
+  return prompt.trim().slice(0, LYRICS_PROMPT_MAX).replace(/[\uD800-\uDBFF]$/, '');
+}
+
+function lyricsFailed(conn: DecryptedConnection, reason?: string | null): ApiError {
+  return new ApiError(
+    502,
+    'generation_failed',
+    `${conn.label} could not write the lyrics: ${reason || 'no reason given'}`,
+  );
+}
+
+function lyricsOf(record: KieRecord): KieLyrics[] {
+  if (record.response?.lyricsData) return record.response.lyricsData;
+  if (!record.resultJson) return [];
+  try {
+    const result = JSON.parse(record.resultJson) as {
+      resultObject?: { lyricsData?: KieLyrics[] };
+    };
+    return result.resultObject?.lyricsData ?? [];
+  } catch {
+    return [];
   }
 }
 

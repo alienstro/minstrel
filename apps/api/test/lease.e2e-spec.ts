@@ -22,7 +22,6 @@ describe('GenerationsRepo lease (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'pending',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
         ...values,
@@ -92,25 +91,5 @@ describe('GenerationsRepo lease (e2e)', () => {
     const rows = await repo.dueJobGenerations(5, userId);
 
     expect(rows.map((r) => r.id)).toEqual([mine]);
-  });
-
-  it('expiredRunning gives only running direct rows with an expired lease', async () => {
-    const expired = await insertGeneration({
-      adapter: 'elevenlabs',
-      flow: 'direct',
-      status: 'running',
-      leaseUntil: sql`now() - interval '1 second'`,
-    });
-    await insertGeneration({
-      adapter: 'elevenlabs',
-      flow: 'direct',
-      status: 'running',
-      leaseUntil: sql`now() + interval '5 minutes'`,
-    });
-    await insertGeneration({ adapter: 'elevenlabs', flow: 'direct', status: 'queued' });
-
-    const rows = await repo.expiredRunning(5);
-
-    expect(rows.map((r) => r.id)).toEqual([expired]);
   });
 });

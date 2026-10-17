@@ -57,7 +57,6 @@ describe('TracksService (e2e)', () => {
       .values({
         userId,
         adapter: 'kie',
-        flow: 'job',
         status: 'complete',
         input: { idea: 'a song', instrumental: false, model: 'V5' },
       })

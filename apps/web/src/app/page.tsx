@@ -12,7 +12,7 @@ const signature = Mrs_Saint_Delafield({ subsets: ['latin'], weight: '400', displ
 
 const ABOUT = [
   'Minstrel started with a simple wish: say what a song is about, and hear it a minute later. No studio, no plug-ins and no new subscription.',
-  'It works with the music services you already pay for. Paste a key from kie.ai, a Suno-compatible API or ElevenLabs, and Minstrel talks to it for you.',
+  'It works with the music services you already pay for. Paste a kie.ai key, and Minstrel talks to it for you.',
   'When you want help, a text model writes the lyrics, the style and the title. Any OpenAI-compatible service works, so you choose the voice behind the words.',
   'Every take lands in your library. Play it, rename it, download it or keep it. Your keys stay encrypted, and your songs stay yours.',
 ];
@@ -28,7 +28,7 @@ export default function Home() {
             Your keys. Your songs.<span className="serif">Start a song</span>
           </h2>
           <div className="mx-auto mt-10 max-w-[760px]">
-            <AuthForm mode="sign-in" bare />
+            <AuthForm bare />
           </div>
         </section>
 

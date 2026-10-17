@@ -21,9 +21,8 @@ export function PrivacyPolicy() {
       <LegalSection title="The data that Minstrel keeps">
         <ul className="m-0 list-disc space-y-2 pl-[18px]">
           <li>
-            <strong>Account data.</strong> Your email address and your name. If you sign up with a password, Minstrel
-            keeps only a hash of the password. If you sign in with Google, Minstrel receives your name, your email
-            address, and your profile picture from Google.
+            <strong>Account data.</strong> Your name, your email address, and your profile picture. Minstrel receives
+            them from Google when you sign in.
           </li>
           <li>
             <strong>Session data.</strong> For each signed-in session: the IP address, the browser user agent, and
@@ -45,8 +44,7 @@ export function PrivacyPolicy() {
 
       <LegalSection title="How Minstrel uses your data">
         <p>
-          Minstrel uses your data only to sign you in, to send you account email (address checks and password
-          resets), to make your songs, to keep your library, and to stop abuse. Minstrel shows no ads, sells no data,
+          Minstrel uses your data only to sign you in, to make your songs, to keep your library, and to stop abuse. Minstrel shows no ads, sells no data,
           and uses no analytics or tracking tools.
         </p>
       </LegalSection>
@@ -64,8 +62,7 @@ export function PrivacyPolicy() {
           <li>Vercel runs the website and the API in its Singapore region.</li>
           <li>Neon stores the database in Singapore.</li>
           <li>Cloudflare R2 stores the song audio and the cover images.</li>
-          <li>Google signs you in when you choose Sign in with Google.</li>
-          <li>Resend sends the account email.</li>
+          <li>Google signs you in.</li>
         </ul>
         <p>
           These services can store or process your data outside the Philippines. Each service processes the data only
@@ -86,12 +83,15 @@ export function PrivacyPolicy() {
           deletion removes your audio files first, then your account, keys, songs, and sessions. The database
           provider keeps a restore history for a short time, at most 30 days, and then removes those copies too.
         </p>
+        <p>
+          Minstrel runs on free plans. If a plan reaches its limit or ends, your data can be lost with no way to get it
+          back. Minstrel keeps no other backup. Download each song that you want to keep.
+        </p>
       </LegalSection>
 
       <LegalSection title="Security">
         <p>
-          Minstrel uses HTTPS for each connection, encrypts your provider keys, keeps only password hashes, and keeps
-          the audio files private. The browser gets audio only through links that expire.
+          Minstrel uses HTTPS for each connection, encrypts your provider keys, and keeps the audio files private. The browser gets audio only through links that expire.
         </p>
       </LegalSection>
 
@@ -109,8 +109,8 @@ export function PrivacyPolicy() {
 
       <LegalSection title="Changes to this policy">
         <p>
-          When this policy changes, the date at the top changes. For an important change, Minstrel also sends an
-          email to each account.
+          When this policy changes, the date at the top changes. For an important change, the operator also sends an
+          email to the address of each account.
         </p>
       </LegalSection>
     </LegalDocument>

@@ -15,7 +15,7 @@ import { useMutation } from '@tanstack/react-query';
 import { type CSSProperties, type FormEvent, useRef, useState } from 'react';
 import { FieldError } from '@/components/ui/text-field';
 import { ApiClientError, apiFetch } from '@/lib/api';
-import { type ModelGroup, ModelPicker, type ModelValue } from './model-picker';
+import { HELPER_RECENT_KEY, type ModelGroup, ModelPicker, type ModelValue } from './model-picker';
 
 interface Props {
   connections: ConnectionDto[];
@@ -26,6 +26,9 @@ interface Props {
 
 type Task = AssistBody['task'];
 type Errors = Record<string, string>;
+
+// The error keys that the form shows next to a field.
+const SHOWN_FIELDS = new Set(['idea', 'model', 'helperModel', 'lyrics', 'style', 'title']);
 
 const DEFAULT_LENGTH = 150;
 const LENGTH_STEP = 5;
@@ -41,19 +44,34 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     models: models[c.id] ?? [],
   }));
 
+  // The helpers (Write lyrics, Suggest) use a text model, so they have their own picker.
+  const helperGroups: ModelGroup[] = textConnection
+    ? [{ connectionId: textConnection.id, connectionLabel: textConnection.label, models: models[textConnection.id] ?? [] }]
+    : [];
+
   const [model, setModel] = useState<ModelValue | null>(() => firstModel(groups));
+  const [helperModel, setHelperModel] = useState<ModelValue | null>(() =>
+    textConnection?.defaultModel ? { connectionId: textConnection.id, modelId: textConnection.defaultModel } : null,
+  );
   const [idea, setIdea] = useState('');
   const [lyrics, setLyrics] = useState('');
   const [style, setStyle] = useState('');
   const [title, setTitle] = useState('');
   const [instrumental, setInstrumental] = useState(false);
   const [length, setLength] = useState(DEFAULT_LENGTH);
+  const [autoLength, setAutoLength] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
   const submitting = useRef(false);
 
   const connection = music.find((c) => c.id === model?.connectionId);
   const caps = providers.find((p) => p.adapter === connection?.adapter)?.capabilities ?? null;
   const range = caps?.lengthSeconds ?? null;
+  const providerName = providers.find((p) => p.adapter === connection?.adapter)?.displayName ?? 'This provider';
+  // The same rule as sunoMode on the API: custom mode needs lyrics, or an instrumental with a style.
+  const customMode = caps?.instrumental && instrumental ? Boolean(style.trim()) : Boolean(lyrics.trim());
+  const lengthFits = !caps?.lengthNeedsCustomMode || customMode;
+  const lengthAutoOn = Boolean(caps?.lengthAuto) && autoLength;
+  const lengthOn = range !== null && !lengthAutoOn && lengthFits;
 
   const create = useMutation({
     mutationFn: (body: CreateGenerationBody) =>
@@ -75,7 +93,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     try {
       const generation = await create.mutateAsync({
         connectionId: model.connectionId,
-        input: buildInput(caps, { idea, lyrics, style, title, instrumental, length, model: model.modelId }),
+        input: buildInput(caps, { idea, lyrics, style, title, instrumental, length: lengthOn ? length : null, model: model.modelId }),
       });
       onCreated(generation);
     } catch (error) {
@@ -86,12 +104,16 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   }
 
   async function help(task: Task, fill: (text: string) => void) {
-    if (!textConnection) return;
+    // Without a text key, Write lyrics uses the music connection of the chosen model (kie.ai).
+    const target = textConnection ?? (task === 'lyrics' ? connection : undefined);
+    if (!target) return;
     if (!idea.trim()) return setErrors({ idea: 'Describe the song first.' });
+    if (textConnection && !helperModel) return setErrors({ helperModel: 'Choose a helper model.' });
     setErrors({});
     try {
       const result = await assist.mutateAsync({
-        connectionId: textConnection.id,
+        connectionId: target.id,
+        ...(textConnection && helperModel ? { model: helperModel.modelId } : {}),
         task,
         idea,
         fields: { lyrics, style, title },
@@ -103,6 +125,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   }
 
   const helperDisabled = !textConnection || assist.isPending;
+  const writeLyricsDisabled = (!textConnection && !connection) || assist.isPending;
   const showLyrics = caps?.lyrics ?? true;
   const showStyle = caps?.style ?? true;
 
@@ -142,15 +165,48 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         ) : null}
       </div>
 
+      {textConnection ? (
+        <div className="min-w-0 max-w-[440px]">
+          <ModelPicker
+            groups={helperGroups}
+            value={helperModel}
+            onPick={setHelperModel}
+            label="Helper model"
+            recentKey={HELPER_RECENT_KEY}
+            errorId={errors.helperModel ? 'song-helper-model-error' : undefined}
+          />
+          <div className="mt-2 pl-5">
+            {errors.helperModel ? (
+              <FieldError id="song-helper-model-error">{errors.helperModel}</FieldError>
+            ) : (
+              <p className="hint">Write lyrics and Suggest use this text model.</p>
+            )}
+          </div>
+        </div>
+      ) : null}
+
       {range ? (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3 pr-5">
             <label htmlFor="song-length" className="lbl">
               Length
             </label>
-            <span className="mono text-[11px] tabular-nums" aria-hidden="true">
-              {formatSeconds(clamp(length, range))}
-            </span>
+            <div className="flex items-center gap-4">
+              {caps?.lengthAuto ? (
+                <label className="sw">
+                  <input
+                    type="checkbox"
+                    aria-label="Auto length"
+                    checked={autoLength}
+                    onChange={(e) => setAutoLength(e.target.checked)}
+                  />
+                  Auto
+                </label>
+              ) : null}
+              <span className={`mono text-[11px] tabular-nums ${lengthOn ? '' : 'mu'}`} aria-hidden="true">
+                {formatSeconds(clamp(length, range))}
+              </span>
+            </div>
           </div>
           <div className="flex px-5">
             <input
@@ -161,13 +217,18 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
               max={range.max}
               step={LENGTH_STEP}
               value={clamp(length, range)}
+              disabled={!lengthOn}
               aria-valuetext={formatSeconds(clamp(length, range))}
               onChange={(e) => setLength(Number(e.target.value))}
               style={{ '--p': `${((clamp(length, range) - range.min) / Math.max(range.max - range.min, 1)) * 100}%` } as CSSProperties}
             />
           </div>
           <p className="hint">
-            From {formatSeconds(range.min)} to {formatSeconds(range.max)}.
+            {lengthAutoOn
+              ? 'The model picks the length. Turn off Auto to choose it.'
+              : !lengthFits
+                ? `${providerName} keeps the length only when the song has lyrics, or is an instrumental with a style.`
+                : `From ${formatSeconds(range.min)} to ${formatSeconds(range.max)}.`}
           </p>
         </div>
       ) : null}
@@ -178,7 +239,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
           label="Lyrics"
           error={errors.lyrics}
           action={
-            <button type="button" className="txt" disabled={helperDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
+            <button type="button" className="txt" disabled={writeLyricsDisabled || instrumental} onClick={() => help('lyrics', setLyrics)}>
               Write lyrics
             </button>
           }
@@ -237,7 +298,13 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
         </Field>
       </div>
 
-      {!textConnection ? <p className="hint">Add a text provider key in Settings to use Write lyrics and Suggest.</p> : null}
+      {!textConnection ? (
+        <p className="hint">
+          {connection
+            ? `Write lyrics uses ${providerName}. Add a text key in Settings to use Suggest.`
+            : 'Add a text provider key in Settings to use Write lyrics and Suggest.'}
+        </p>
+      ) : null}
 
       {errors.form ? (
         <div role="alert" className="pl-5">
@@ -300,13 +367,14 @@ const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).pad
 // Only the fields that the provider uses go out. A title always goes, because Minstrel keeps it.
 function buildInput(
   caps: MusicCapabilities,
-  form: { idea: string; lyrics: string; style: string; title: string; instrumental: boolean; length: number; model: string },
+  /** `length` is null when Auto is on, or when the provider would not keep the length. */
+  form: { idea: string; lyrics: string; style: string; title: string; instrumental: boolean; length: number | null; model: string },
 ): GenerationInput {
   const input: GenerationInput = { idea: form.idea.trim(), instrumental: caps.instrumental && form.instrumental, model: form.model };
   if (caps.lyrics && !input.instrumental && form.lyrics.trim()) input.lyrics = form.lyrics;
   if (caps.style && form.style.trim()) input.style = form.style.trim();
   if (form.title.trim()) input.title = form.title.trim();
-  if (caps.lengthSeconds) input.lengthSeconds = clamp(form.length, caps.lengthSeconds);
+  if (caps.lengthSeconds && form.length !== null) input.lengthSeconds = clamp(form.length, caps.lengthSeconds);
   return input;
 }
 
@@ -314,7 +382,9 @@ function toErrors(error: unknown): Errors {
   if (error instanceof ApiClientError) {
     if (!error.fields) return { form: error.message };
     // The API names input fields with or without the "input." prefix.
-    return Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k.replace(/^input\./, ''), v]));
+    const errors: Errors = Object.fromEntries(Object.entries(error.fields).map(([k, v]) => [k.replace(/^input\./, ''), v]));
+    // The form has no place for some fields, for example connectionId. Then it shows the message at the end.
+    return Object.keys(errors).some((k) => SHOWN_FIELDS.has(k)) ? errors : { ...errors, form: error.message };
   }
   return { form: 'Minstrel could not send the request. Try again.' };
 }

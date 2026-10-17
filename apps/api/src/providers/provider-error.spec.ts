@@ -45,8 +45,8 @@ describe('mapProviderError', () => {
   });
 
   it('the message uses the connection label', () => {
-    expect(mapProviderError(401, '', 'My sunoapi').message).toMatch(
-      /^My sunoapi did not accept/,
+    expect(mapProviderError(401, '', 'My kie.ai').message).toMatch(
+      /^My kie.ai did not accept/,
     );
   });
 

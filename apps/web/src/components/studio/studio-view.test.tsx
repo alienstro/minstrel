@@ -1,4 +1,4 @@
-import type { ConnectionDto, GenerationDto, GenerationStatus, ProviderInfo } from '@minstrel/shared';
+import type { ConnectionDto, GenerationDto, GenerationStatus, ProviderInfo, TrackDto } from '@minstrel/shared';
 import { screen, within } from '@testing-library/react';
 import { PlayerProvider } from '@/components/player/player-context';
 import { fakeApi, renderWithQuery } from '@/test/render';
@@ -30,7 +30,6 @@ const generation = (id: string, status: GenerationStatus, idea: string): Generat
   id,
   connectionId: 'c-kie',
   adapter: 'kie',
-  flow: 'job',
   status,
   input: { idea, instrumental: false, model: 'V6' },
   error: null,
@@ -39,13 +38,25 @@ const generation = (id: string, status: GenerationStatus, idea: string): Generat
   updatedAt: '2026-10-17T10:00:00.000Z',
 });
 
-function renderStudio(recent: GenerationDto[]) {
+const track = (id: string, generationId: string): TrackDto => ({
+  id,
+  generationId,
+  title: 'Fallen Soldier',
+  style: null,
+  lyrics: null,
+  durationSeconds: 180,
+  storageStatus: 'stored',
+  createdAt: '2026-10-17T10:01:00.000Z',
+});
+
+/** `polled` holds what a later read of a generation returns, when it differs from the list. */
+function renderStudio(recent: GenerationDto[], polled: GenerationDto[] = []) {
   const api = fakeApi({
     'GET /api/connections': [connection],
     'GET /api/providers': [kie],
     'GET /api/connections/c-kie/models': [],
     'GET /api/generations': { items: recent, nextCursor: null },
-    ...Object.fromEntries(recent.map((g) => [`GET /api/generations/${g.id}`, g])),
+    ...Object.fromEntries([...recent, ...polled].map((g) => [`GET /api/generations/${g.id}`, g])),
   });
   renderWithQuery(
     <PlayerProvider>
@@ -65,6 +76,16 @@ describe('StudioView', () => {
     const takes = await screen.findByRole('region', { name: 'Takes' });
     expect(await within(takes).findByRole('article', { name: 'a sea shanty about a lost cat' })).toBeInTheDocument();
   });
+
+  it('the takes count includes the takes that arrive while the page polls', async () => {
+    const pending = generation('g-1', 'pending', 'a fallen soldier');
+    const done = { ...pending, status: 'complete' as const, tracks: [track('t-1', 'g-1'), track('t-2', 'g-1')] };
+    renderStudio([pending], [done]);
+    const takes = await screen.findByRole('region', { name: 'Takes' });
+    expect(within(takes).getByText('0 takes')).toBeInTheDocument();
+    // The first poll comes after POLL_MS (3 s).
+    expect(await within(takes).findByText('2 takes', {}, { timeout: 6000 })).toBeInTheDocument();
+  }, 10_000);
 
   it('the Takes panel shows each song in progress and only the 3 newest finished songs', async () => {
     renderStudio([

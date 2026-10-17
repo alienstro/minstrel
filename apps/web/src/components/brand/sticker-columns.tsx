@@ -23,24 +23,24 @@ type Sticker =
 
 type Photos = [string, string, string];
 
-// The left column. The right column starts 3 stickers later, turns the other way, and shows other photos and providers.
+// The left column. The right column starts 3 stickers later, turns the other way, and shows other photos and words.
 function stickers(left: Photos, right: Photos): { left: Sticker[]; right: Sticker[] } {
   const base: Sticker[] = [
     { kind: 'photo', r: -6, img: left[0] },
     { kind: 'star', r: 8, d: BIG_STAR },
     { kind: 'photo', r: 5, img: left[1] },
-    { kind: 'tag', r: -4, text: 'kie.ai' },
+    { kind: 'tag', r: -4, text: 'Demo' },
     { kind: 'badge', r: 6 },
     { kind: 'photo', r: -3, img: left[2] },
-    { kind: 'tag', r: 3, text: 'ElevenLabs' },
+    { kind: 'tag', r: 3, text: 'Lo-fi' },
     { kind: 'star', r: -10, d: SMALL_STAR },
   ];
   const swap: Record<string, string> = {
     [left[0]]: right[0],
     [left[1]]: right[1],
     [left[2]]: right[2],
-    'kie.ai': 'Suno',
-    ElevenLabs: 'OpenRouter',
+    Demo: 'B-side',
+    'Lo-fi': 'Remix',
   };
   const mirrored = [...base.slice(3), ...base.slice(0, 3)].map((s): Sticker => {
     if (s.kind === 'photo') return { ...s, r: -s.r, img: swap[s.img] ?? s.img };
@@ -135,7 +135,7 @@ export function StickerColumns({ starText, photos, large = false, inset = 20 }: 
           {/* The track holds the list two times, so the scroll loops without a jump. */}
           <div className="stk-track">
             {[...sets[side], ...sets[side]].map((sticker, i) => (
-              <StickerView key={i} sticker={sticker} side={side} lines={side === 'left' ? starText : ['V6']} sizes={sizes} />
+              <StickerView key={i} sticker={sticker} side={side} lines={side === 'left' ? starText : ['HIT', 'PLAY']} sizes={sizes} />
             ))}
           </div>
         </div>

@@ -10,7 +10,6 @@ export type TrackRow = typeof tracks.$inferSelect;
 
 // Spec §5.3 step 4: a job generation is due in pending, text_ready, or first_ready at next_poll_at.
 const isDue = and(
-  eq(generations.flow, 'job'),
   inArray(generations.status, JOB_DUE_STATES),
   lte(generations.nextPollAt, sql`now()`),
 )!;
@@ -62,23 +61,6 @@ export class GenerationsRepo {
       .from(generations)
       .where(and(isDue, userId ? eq(generations.userId, userId) : undefined))
       .orderBy(asc(generations.nextPollAt))
-      .limit(limit);
-  }
-
-  /** Direct generations in running whose lease has expired, for example after the instance stopped. */
-  expiredRunning(limit: number, userId?: string): Promise<GenerationRow[]> {
-    return this.db
-      .select()
-      .from(generations)
-      .where(
-        and(
-          eq(generations.flow, 'direct'),
-          eq(generations.status, 'running'),
-          lt(generations.leaseUntil, sql`now()`),
-          userId ? eq(generations.userId, userId) : undefined,
-        ),
-      )
-      .orderBy(asc(generations.createdAt))
       .limit(limit);
   }
 
@@ -137,15 +119,5 @@ export class GenerationsRepo {
       .orderBy(asc(tracks.createdAt))
       .limit(limit);
     return rows.map((r) => r.id);
-  }
-
-  /** Users with queued direct generations, for the sweep. */
-  async usersWithQueuedDirect(limit: number): Promise<string[]> {
-    const rows = await this.db
-      .selectDistinct({ userId: generations.userId })
-      .from(generations)
-      .where(and(eq(generations.flow, 'direct'), eq(generations.status, 'queued')))
-      .limit(limit);
-    return rows.map((r) => r.userId);
   }
 }

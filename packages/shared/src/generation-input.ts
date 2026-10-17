@@ -11,11 +11,9 @@ export interface GenerationInput {
   lengthSeconds?: number;
 }
 
-// Spec §5.1. ElevenLabs allows 3–600 s, but Minstrel keeps each call inside the 300 s function limit.
+// Spec §5.1.
 export const LENGTH_LIMITS: Record<MusicAdapter, { min: number; max: number }> = {
   kie: { min: 10, max: 360 },
-  suno_classic: { min: 10, max: 360 },
-  elevenlabs: { min: 5, max: 180 },
 };
 
 export const TEXT_LIMITS = { title: 80, style: 1000, lyrics: 5000, idea: 3000 } as const;

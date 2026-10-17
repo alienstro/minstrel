@@ -72,7 +72,7 @@ describe('ConnectionsService (e2e)', () => {
   it('a duplicate label fails on label', async () => {
     await service.create(userId, kieBody);
     await expect(
-      service.create(userId, { ...kieBody, adapter: 'suno_classic' }),
+      service.create(userId, { ...kieBody, apiKey: 'sk-kie-other-1234' }),
     ).rejects.toMatchObject({
       status: 400,
       code: 'invalid_input',

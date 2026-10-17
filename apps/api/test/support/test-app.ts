@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing';
 import type { App } from 'supertest/types.js';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
-import { MAILER } from '../../src/auth/mailer.js';
 import { BackgroundWork } from '../../src/common/background-work.js';
 import {
   MUSIC_PROVIDERS,
@@ -14,7 +13,6 @@ import { SAFE_FETCH, type SafeFetch } from '../../src/net/safe-fetch.js';
 import { AUDIO_STORE } from '../../src/storage/audio-store.js';
 import { FakeAudioStore } from './fake-audio-store.js';
 import { FakeBackgroundWork } from './fake-background-work.js';
-import { FakeMailer } from './fake-mailer.js';
 import { fakeMusicProviders, fakeTextProvider } from './fake-providers.js';
 import { TEST_DATABASE_URL } from './test-db.js';
 
@@ -24,7 +22,6 @@ export const TEST_KEY_ENCRYPTION_KEYS = `1:${Buffer.alloc(32, 7).toString('base6
 
 export interface TestApp {
   app: INestApplication<App>;
-  mailer: FakeMailer;
   background: FakeBackgroundWork;
   audioStore: FakeAudioStore;
 }
@@ -35,6 +32,8 @@ export interface TestAppOptions {
   /** The fake providers replace the real ones, so no test calls a provider. */
   musicProviders?: MusicProvider[];
   textProvider?: TextProvider;
+  /** Fake mode allows password sign-in, so a test can get a session. The default is true. */
+  fakeMode?: boolean;
   /** The outbound fetch for audio downloads. The default throws, so no test calls the network. */
   safeFetch?: SafeFetch;
 }
@@ -56,15 +55,14 @@ process.env.R2_ACCESS_KEY_ID ??= 'test-id';
 process.env.R2_SECRET_ACCESS_KEY ??= 'test-secret';
 process.env.R2_BUCKET ??= 'test-bucket';
 process.env.CRON_SECRET = TEST_CRON_SECRET;
-  const mailer = new FakeMailer();
+  if (options.fakeMode === false) delete process.env.MINSTREL_FAKE_PROVIDERS;
+  else process.env.MINSTREL_FAKE_PROVIDERS = '1';
   const background = new FakeBackgroundWork();
   const audioStore = new FakeAudioStore();
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
     controllers: options.controllers ?? [],
   })
-    .overrideProvider(MAILER)
-    .useValue(mailer)
     .overrideProvider(BackgroundWork)
     .useValue(background)
     .overrideProvider(MUSIC_PROVIDERS)
@@ -81,5 +79,5 @@ process.env.CRON_SECRET = TEST_CRON_SECRET;
   });
   configureApp(app);
   await app.init();
-  return { app, mailer, background, audioStore };
+  return { app, background, audioStore };
 }

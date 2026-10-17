@@ -37,8 +37,6 @@ Set each variable for Production and Preview. No secret uses the `NEXT_PUBLIC_` 
 | `BETTER_AUTH_SECRET` | 32 or more random bytes |
 | `KEY_ENCRYPTION_KEYS` | `1:<base64 of 32 random bytes>` |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | From the Google Cloud console |
-| `RESEND_API_KEY` | A Resend API key with Sending access to the verified domain only |
-| `EMAIL_FROM`, `EMAIL_REPLY_TO` | `Minstrel <noreply@alienstro.xyz>` and `robinxaquino@gmail.com` |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | From Cloudflare R2 |
 
 > **Warning:** Do not set `MINSTREL_FAKE_PROVIDERS` on Vercel. It is for the local end-to-end test only.
@@ -71,14 +69,12 @@ The Vercel docs do not state these items for services. Check each one and write 
 
 ## 8. Checks before launch
 
-1. **Client IP (§7.4).** From one network, sign in with a wrong password until Better Auth replies
-   `429`. From a second network, sign in at once: it must work. This proves that the auth rate limit
+1. **Client IP (§7.4).** From one network, send `POST /api/auth/sign-in/social` until Better Auth
+   replies `429`. From a second network, sign in with Google at once: it must work. This proves that the auth rate limit
    reads the real client IP from `x-real-ip`. Then send 11 songs in one minute from one account. The 11th
    reply must be `429 rate_limited`.
-2. **Manual songs (§11).** On the production setup, make one real song with each adapter:
-   - kie.ai: the song completes, and both takes play from R2.
-   - A Suno-compatible service: the song completes, and both takes play from R2.
-   - ElevenLabs: a 180 s song finishes in less than 240 s. Write the measured time here.
+2. **Manual songs (§11).** On the production setup, make one real song with kie.ai. The song
+   completes, and both takes play from R2.
 3. **Account deletion.** Delete a test account. Its objects under `users/<userId>/` in R2 must be gone.
 
 ## 9. Rotate the key encryption key (§7.1)
