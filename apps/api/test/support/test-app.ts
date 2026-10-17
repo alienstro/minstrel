@@ -19,6 +19,7 @@ import { fakeMusicProviders, fakeTextProvider } from './fake-providers.js';
 import { TEST_DATABASE_URL } from './test-db.js';
 
 export const TEST_ORIGIN = 'http://localhost:3000';
+export const TEST_CRON_SECRET = 'test-cron-secret-0123456789';
 export const TEST_KEY_ENCRYPTION_KEYS = `1:${Buffer.alloc(32, 7).toString('base64')}`;
 
 export interface TestApp {
@@ -54,6 +55,7 @@ process.env.R2_ACCOUNT_ID ??= 'test-account';
 process.env.R2_ACCESS_KEY_ID ??= 'test-id';
 process.env.R2_SECRET_ACCESS_KEY ??= 'test-secret';
 process.env.R2_BUCKET ??= 'test-bucket';
+process.env.CRON_SECRET = TEST_CRON_SECRET;
   const mailer = new FakeMailer();
   const background = new FakeBackgroundWork();
   const audioStore = new FakeAudioStore();

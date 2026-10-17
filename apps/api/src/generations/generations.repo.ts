@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { DB, type Db } from '../db/db.module.js';
 import { generations, tracks } from '../db/schema.js';
 import { JOB_DUE_STATES } from './rules.js';
@@ -117,5 +117,27 @@ export class GenerationsRepo {
       .from(tracks)
       .where(inArray(tracks.generationId, generationIds))
       .orderBy(asc(tracks.createdAt), asc(tracks.providerTrackId));
+  }
+
+  /**
+   * Spec §5.3 step 5.2: tracks to copy again. Only tracks of complete generations, because the
+   * sync starts the copy at complete.
+   */
+  async retryableTracks(maxAttempts: number, limit: number): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: tracks.id })
+      .from(tracks)
+      .innerJoin(generations, eq(generations.id, tracks.generationId))
+      .where(
+        and(
+          inArray(tracks.storageStatus, ['pending', 'copy_failed']),
+          lt(tracks.copyAttempts, maxAttempts),
+          isNotNull(tracks.providerAudioUrl),
+          eq(generations.status, 'complete'),
+        ),
+      )
+      .orderBy(asc(tracks.createdAt))
+      .limit(limit);
+    return rows.map((r) => r.id);
   }
 }
