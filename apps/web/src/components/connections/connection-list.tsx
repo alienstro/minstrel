@@ -96,6 +96,8 @@ function ConnectionRow({ connection, providerName }: { connection: ConnectionDto
     mutationFn: () => apiFetch<void>(`/api/connections/${connection.id}`, { method: 'DELETE' }),
     onSettled: refresh,
   });
+  // The UI never shows a key again (spec §7.1), so a remove asks first, as the Library delete does.
+  const [confirming, setConfirming] = useState(false);
   const labelId = `connection-${connection.id}`;
 
   return (
@@ -107,12 +109,31 @@ function ConnectionRow({ connection, providerName }: { connection: ConnectionDto
           {STATUS_TEXT[connection.status]}
         </span>
       </div>
-      <button type="button" className="btn btn-soft" disabled={test.isPending} onClick={() => test.mutate()}>
-        Test key
-      </button>
-      <button type="button" className="btn btn-text" disabled={remove.isPending} onClick={() => remove.mutate()}>
-        Remove
-      </button>
+      {confirming ? (
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="text-sm">Remove this key? Songs in progress with this key will fail.</span>
+          <button type="button" className="btn btn-soft" disabled={remove.isPending} onClick={() => remove.mutate()}>
+            Yes, remove
+          </button>
+          <button type="button" className="btn btn-text" onClick={() => setConfirming(false)}>
+            Cancel
+          </button>
+          {remove.isError ? (
+            <span role="alert" className="text-sm">
+              Minstrel could not remove this key. Try again.
+            </span>
+          ) : null}
+        </span>
+      ) : (
+        <>
+          <button type="button" className="btn btn-soft" disabled={test.isPending} onClick={() => test.mutate()}>
+            Test key
+          </button>
+          <button type="button" className="btn btn-text" onClick={() => setConfirming(true)}>
+            Remove
+          </button>
+        </>
+      )}
     </li>
   );
 }

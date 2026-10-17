@@ -65,6 +65,43 @@ describe('ConnectionsSettings', () => {
     expect(screen.queryByText('Add a music provider key to make songs.')).toBeNull();
   });
 
+  it('Remove deletes the key only after "Yes, remove"', async () => {
+    const api = fakeApi({
+      'GET /api/connections': [kie],
+      'GET /api/providers': providers,
+      'DELETE /api/connections/c1': undefined,
+    });
+    renderWithQuery(<ConnectionsSettings />);
+    const row = await screen.findByRole('listitem', { name: 'kie.ai' });
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }));
+    expect(row).toHaveTextContent('Remove this key? Songs in progress with this key will fail.');
+    expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Cancel' }));
+    expect(within(row).getByRole('button', { name: 'Remove' })).toBeInTheDocument();
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Yes, remove' }));
+    expect(api.calls.filter((c) => c.method === 'DELETE')).toHaveLength(1);
+  });
+
+  it('a failed remove shows an alert', async () => {
+    fakeApi({
+      'GET /api/connections': [kie],
+      'GET /api/providers': providers,
+      'DELETE /api/connections/c1': () => {
+        throw new Response(JSON.stringify({ code: 'internal_error', message: 'Something went wrong.' }), {
+          status: 500,
+        });
+      },
+    });
+    renderWithQuery(<ConnectionsSettings />);
+    const row = await screen.findByRole('listitem', { name: 'kie.ai' });
+    await userEvent.click(within(row).getByRole('button', { name: 'Remove' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Yes, remove' }));
+    expect(await within(row).findByRole('alert')).toHaveTextContent('Minstrel could not remove this key. Try again.');
+  });
+
   it('Add key shows the toast "Key added"', async () => {
     let connections: ConnectionDto[] = [];
     const api = fakeApi({
