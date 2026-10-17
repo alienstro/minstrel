@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { ApiExceptionFilter } from './common/api-exception.filter.js';
+import { OriginGuard } from './common/origin.guard.js';
 import { authEnvFromProcess, createAuth } from './auth/auth.js';
 import { MAILER, ResendMailer, type Mailer } from './auth/mailer.js';
 import { DB, DbModule, type Db } from './db/db.module.js';
@@ -39,6 +40,7 @@ class MailerModule {}
   providers: [
     AppService,
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
+    { provide: APP_GUARD, useClass: OriginGuard },
   ],
 })
 export class AppModule {}
