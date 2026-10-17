@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "build": "nest build && echo '{\"type\":\"module\"}' > dist/package.json",
+    "build": "nest build && node scripts/bundle-for-vercel.mjs",
     "vercel-build": "drizzle-kit migrate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -62,6 +62,7 @@
     "@vitest/coverage-v8": "^4.1.2",
     "aws-sdk-client-mock": "^4.1.0",
     "drizzle-kit": "^0.31.11",
+    "esbuild": "0.28.2",
     "oxlint": "^1.58.0",
     "oxlint-tsgolint": "^7.0.2001",
     "prettier": "^3.4.2",
