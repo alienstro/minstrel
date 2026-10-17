@@ -1,51 +1,36 @@
 @import "tailwindcss";
 
-/* Spec §10.2, "the chrome disc". Gray and nearly black and white. The laser green is for the scene only. */
+/* The "Minstrel Mono" canvas: white ground, three grays, near-black ink, pill controls.
+   The canvas has no dark version, so the app has only the light one. */
 :root {
-  --bg: #bec2c4;
-  --panel: #dddddd;
+  --bg: #ffffff;
+  --cream: #eeeeee;
+  --cream2: #e6e6e6;
+  --cream3: #cdcdcd;
   --ink: #111111;
-  --muted: #4a4a4a;
-  --action: #2d2d2d;
-  --on-action: #ffffff;
-  --soft: #b5adad;
-  --field: rgb(255 255 255 / 70%);
+  --mu: #555555;
+  --bd: rgb(0 0 0 / 20%);
   --placeholder: #6f6f6f;
-  --laser: #3dff8a;
-  --selection: #0059ff;
-  --card-shadow: 0 0 40px rgb(51 51 51 / 10%);
+  --card-shadow: 0 0 0 1px rgb(0 0 0 / 8%), 0 24px 48px -28px rgb(0 0 0 / 35%);
   color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1c1d;
-    --panel: #2d2d2d;
-    --ink: #eeeeee;
-    --muted: #a8a8a8;
-    --action: #eeeeee;
-    --on-action: #111111;
-    --soft: #4a4646;
-    --field: rgb(0 0 0 / 25%);
-    --placeholder: #a8a8a8;
-    color-scheme: dark;
-  }
 }
 
 @theme inline {
   --color-bg: var(--bg);
-  --color-panel: var(--panel);
+  --color-panel: var(--cream);
+  --color-cream: var(--cream);
+  --color-cream2: var(--cream2);
+  --color-cream3: var(--cream3);
   --color-ink: var(--ink);
-  --color-muted: var(--muted);
-  --color-action: var(--action);
-  --color-on-action: var(--on-action);
-  --color-soft: var(--soft);
-  --color-field: var(--field);
-  --color-laser: var(--laser);
-  --font-sans: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --radius-card: 25px;
-  --radius-control: 20px;
-  --radius-pill: 13px;
+  --color-muted: var(--mu);
+  --color-action: var(--ink);
+  --color-on-action: #ffffff;
+  --color-soft: var(--cream2);
+  --font-sans: var(--font-geist), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-serif: var(--font-instrument-serif), serif;
+  --radius-card: 28px;
+  --radius-pill: 999px;
   --shadow-card: var(--card-shadow);
 }
 
@@ -59,21 +44,22 @@
     background: var(--bg);
     color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 16px;
-    font-weight: 700;
-    letter-spacing: -0.25px;
-    line-height: 1.25;
+    font-size: 13px;
+    line-height: 1.5;
     -webkit-font-smoothing: antialiased;
   }
 
-  ::selection {
-    background: var(--selection);
-    color: #ffffff;
+  a {
+    color: inherit;
+  }
+
+  a:hover {
+    color: #000000;
   }
 
   :focus-visible {
     outline: 2px solid var(--ink);
-    outline-offset: 2px;
+    outline-offset: 3px;
   }
 
   ::placeholder {
@@ -82,40 +68,148 @@
 }
 
 @layer components {
+  /* Canvas classes. */
+  .vh {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .mono {
+    font-family: var(--font-mono);
+  }
+
+  .serif {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-weight: 400;
+  }
+
+  .mu {
+    color: var(--mu);
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 999px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  .pill:hover:not(:disabled) {
+    transform: scale(1.04);
+  }
+
+  .pill:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .dark {
+    background: var(--ink);
+    color: #ffffff;
+    text-transform: uppercase;
+  }
+
+  .dark:hover {
+    color: #ffffff;
+  }
+
+  .gl {
+    background: linear-gradient(#ffffff, #e8e7ea);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .in {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 999px;
+    background: var(--cream2);
+    color: var(--ink);
+    font: inherit;
+    font-size: 14px;
+  }
+
+  .in:focus {
+    outline: 2px solid var(--ink);
+    outline-offset: 0;
+    background: #ffffff;
+  }
+
+  .in[aria-invalid="true"] {
+    box-shadow: inset 0 0 0 2px var(--ink);
+  }
+
+  .card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 14px;
+    border-radius: var(--radius-card);
+    background: #ffffff;
+    box-shadow: var(--card-shadow);
+  }
+
+  .dotted {
+    border: none;
+    border-bottom: 1px dotted var(--bd);
+    padding: 0;
+    text-decoration: none;
+    background: none;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  /* Older classes. They take the canvas look until each screen moves to the canvas markup. */
   .type-page-title {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -1px;
+    font-family: var(--font-serif);
+    font-size: 40px;
+    font-style: italic;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.02em;
   }
 
   .type-section-title {
-    font-size: 18px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
   }
 
   .type-label {
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
   }
 
   .type-tag {
+    font-family: var(--font-mono);
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0;
   }
 
   .tabular {
     font-variant-numeric: tabular-nums;
   }
 
-  /* A card has its title in a dark pill that floats 10 px above it. */
-  .card {
-    position: relative;
-    border-radius: var(--radius-card);
-    background: var(--panel);
-    box-shadow: var(--card-shadow);
+  .card:has(> .card-pill) {
     padding: 28px 20px 20px;
   }
 
@@ -125,22 +219,34 @@
     left: 20px;
     display: inline-flex;
     align-items: center;
-    height: 26px;
+    height: 24px;
     padding: 0 12px;
-    border-radius: var(--radius-pill);
-    background: var(--action);
-    color: var(--on-action);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
+    border-radius: 999px;
+    background: var(--ink);
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
   }
 
   .field {
     width: 100%;
-    border-radius: var(--radius-control);
-    background: var(--field);
+    min-height: 44px;
+    padding: 10px 20px;
+    border-radius: 999px;
+    background: var(--cream2);
     color: var(--ink);
-    padding: 14px 16px;
+    font-size: 14px;
+  }
+
+  textarea.field {
+    border-radius: 22px;
+  }
+
+  .field:focus {
+    outline: 2px solid var(--ink);
+    outline-offset: 0;
+    background: #ffffff;
   }
 
   .field[aria-invalid="true"] {
@@ -150,16 +256,17 @@
   .btn {
     display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: center;
+    gap: 10px;
     min-height: 44px;
-    padding: 0 18px;
-    border-radius: var(--radius-control);
-    transition: transform 120ms ease;
+    padding: 0 22px;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .btn:active:not(:disabled) {
-    transform: scale(0.98);
+  .btn:hover:not(:disabled) {
+    transform: scale(1.04);
   }
 
   .btn:disabled {
@@ -167,26 +274,29 @@
     opacity: 0.55;
   }
 
-  /* One primary action on each screen: label on the left, chevron on the right. */
   .btn-primary {
-    min-height: 55px;
-    background: var(--action);
-    color: var(--on-action);
+    background: var(--ink);
+    color: #ffffff;
+    text-transform: uppercase;
   }
 
   .btn-soft {
-    background: var(--soft);
+    background: linear-gradient(#ffffff, #e8e7ea);
+    box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
     color: var(--ink);
+    font-weight: 500;
   }
 
   .btn-text {
-    padding: 0 6px;
-    text-decoration: underline;
-    text-underline-offset: 3px;
+    min-height: 0;
+    padding: 0;
+    border-bottom: 1px dotted var(--bd);
+    border-radius: 0;
+    font-weight: 400;
   }
 }
 
-/* Spec §10.2 principle 4: a new take grows into the Takes list. */
+/* A new take grows into the Takes list. */
 @keyframes take-enter {
   from {
     opacity: 0;
@@ -205,12 +315,4 @@
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
-}
-
-/* Thin laser lines across the scene gray. Decorative only. */
-.laser-scene {
-  background:
-    repeating-linear-gradient(115deg, transparent 0 46px, rgb(61 255 138 / 35%) 46px 47px, transparent 47px 140px),
-    repeating-linear-gradient(65deg, transparent 0 90px, rgb(61 255 138 / 22%) 90px 91px, transparent 91px 220px),
-    var(--bg);
 }
