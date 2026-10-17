@@ -48,12 +48,19 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
   const [title, setTitle] = useState('');
   const [instrumental, setInstrumental] = useState(false);
   const [length, setLength] = useState(DEFAULT_LENGTH);
+  const [autoLength, setAutoLength] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
   const submitting = useRef(false);
 
   const connection = music.find((c) => c.id === model?.connectionId);
   const caps = providers.find((p) => p.adapter === connection?.adapter)?.capabilities ?? null;
   const range = caps?.lengthSeconds ?? null;
+  const providerName = providers.find((p) => p.adapter === connection?.adapter)?.displayName ?? 'This provider';
+  // The same rule as sunoMode on the API: custom mode needs lyrics, or an instrumental with a style.
+  const customMode = caps?.instrumental && instrumental ? Boolean(style.trim()) : Boolean(lyrics.trim());
+  const lengthFits = !caps?.lengthNeedsCustomMode || customMode;
+  const lengthAutoOn = Boolean(caps?.lengthAuto) && autoLength;
+  const lengthOn = range !== null && !lengthAutoOn && lengthFits;
 
   const create = useMutation({
     mutationFn: (body: CreateGenerationBody) =>
@@ -75,7 +82,7 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
     try {
       const generation = await create.mutateAsync({
         connectionId: model.connectionId,
-        input: buildInput(caps, { idea, lyrics, style, title, instrumental, length, model: model.modelId }),
+        input: buildInput(caps, { idea, lyrics, style, title, instrumental, length: lengthOn ? length : null, model: model.modelId }),
       });
       onCreated(generation);
     } catch (error) {
@@ -148,9 +155,22 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
             <label htmlFor="song-length" className="lbl">
               Length
             </label>
-            <span className="mono text-[11px] tabular-nums" aria-hidden="true">
-              {formatSeconds(clamp(length, range))}
-            </span>
+            <div className="flex items-center gap-4">
+              {caps?.lengthAuto ? (
+                <label className="sw">
+                  <input
+                    type="checkbox"
+                    aria-label="Auto length"
+                    checked={autoLength}
+                    onChange={(e) => setAutoLength(e.target.checked)}
+                  />
+                  Auto
+                </label>
+              ) : null}
+              <span className={`mono text-[11px] tabular-nums ${lengthOn ? '' : 'mu'}`} aria-hidden="true">
+                {formatSeconds(clamp(length, range))}
+              </span>
+            </div>
           </div>
           <div className="flex px-5">
             <input
@@ -161,13 +181,18 @@ export function SongForm({ connections, providers, models, onCreated }: Props) {
               max={range.max}
               step={LENGTH_STEP}
               value={clamp(length, range)}
+              disabled={!lengthOn}
               aria-valuetext={formatSeconds(clamp(length, range))}
               onChange={(e) => setLength(Number(e.target.value))}
               style={{ '--p': `${((clamp(length, range) - range.min) / Math.max(range.max - range.min, 1)) * 100}%` } as CSSProperties}
             />
           </div>
           <p className="hint">
-            From {formatSeconds(range.min)} to {formatSeconds(range.max)}.
+            {lengthAutoOn
+              ? 'The model picks the length. Turn off Auto to choose it.'
+              : !lengthFits
+                ? `${providerName} keeps the length only when the song has lyrics, or is an instrumental with a style.`
+                : `From ${formatSeconds(range.min)} to ${formatSeconds(range.max)}.`}
           </p>
         </div>
       ) : null}
@@ -300,13 +325,14 @@ const formatSeconds = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).pad
 // Only the fields that the provider uses go out. A title always goes, because Minstrel keeps it.
 function buildInput(
   caps: MusicCapabilities,
-  form: { idea: string; lyrics: string; style: string; title: string; instrumental: boolean; length: number; model: string },
+  /** `length` is null when Auto is on, or when the provider would not keep the length. */
+  form: { idea: string; lyrics: string; style: string; title: string; instrumental: boolean; length: number | null; model: string },
 ): GenerationInput {
   const input: GenerationInput = { idea: form.idea.trim(), instrumental: caps.instrumental && form.instrumental, model: form.model };
   if (caps.lyrics && !input.instrumental && form.lyrics.trim()) input.lyrics = form.lyrics;
   if (caps.style && form.style.trim()) input.style = form.style.trim();
   if (form.title.trim()) input.title = form.title.trim();
-  if (caps.lengthSeconds) input.lengthSeconds = clamp(form.length, caps.lengthSeconds);
+  if (caps.lengthSeconds && form.length !== null) input.lengthSeconds = clamp(form.length, caps.lengthSeconds);
   return input;
 }
 

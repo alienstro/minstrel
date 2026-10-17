@@ -53,7 +53,10 @@ export class KieMusicProvider implements JobMusicProvider {
     style: true,
     providerTitle: true,
     instrumental: true,
-    lengthSeconds: null,
+    // kie.ai sends `duration` only in custom mode (see toKieInput).
+    lengthSeconds: { min: 10, max: 360 },
+    lengthAuto: true,
+    lengthNeedsCustomMode: true,
     tracksPerRequest: 2,
   };
 

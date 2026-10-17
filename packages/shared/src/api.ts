@@ -56,6 +56,10 @@ export interface MusicCapabilities {
   providerTitle: boolean;
   instrumental: boolean;
   lengthSeconds: { min: number; max: number } | null;
+  /** The provider picks a length when it gets none, so the form offers Auto. */
+  lengthAuto?: boolean;
+  /** Suno keeps the length only in custom mode: a song with lyrics, or an instrumental with a style. */
+  lengthNeedsCustomMode?: boolean;
   tracksPerRequest: number;
 }
 

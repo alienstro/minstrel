@@ -5,8 +5,9 @@ import { fakeApi, renderWithQuery } from '@/test/render';
 import { SongForm } from './song-form';
 
 const caps = { lyrics: true, style: true, providerTitle: true, instrumental: true, lengthSeconds: null, tracksPerRequest: 2 };
+const kieCaps = { ...caps, lengthSeconds: { min: 10, max: 360 }, lengthAuto: true, lengthNeedsCustomMode: true };
 const providers: ProviderInfo[] = [
-  { adapter: 'kie', kind: 'music', displayName: 'kie.ai', defaultBaseUrl: '', keyUrl: '', capabilities: caps },
+  { adapter: 'kie', kind: 'music', displayName: 'kie.ai', defaultBaseUrl: '', keyUrl: '', capabilities: kieCaps },
   {
     adapter: 'elevenlabs',
     kind: 'music',
@@ -76,10 +77,32 @@ describe('SongForm', () => {
     expect(slider).toHaveValue('150');
   });
 
-  it('a kie model hides the slider', async () => {
+  it('a kie model shows Length with Auto on, so the slider is off and the model picks the length', async () => {
     renderForm();
     await pickModel('V6');
-    expect(screen.queryByRole('slider', { name: /length/i })).toBeNull();
+    expect(screen.getByRole('checkbox', { name: 'Auto length' })).toBeChecked();
+    expect(screen.getByRole('slider', { name: /length/i })).toBeDisabled();
+  });
+
+  it('with Auto off and lyrics, a kie request sends the chosen length', async () => {
+    const api = fakeApi({ 'POST /api/generations': generation });
+    renderForm();
+    await pickModel('V6');
+    await userEvent.type(screen.getByLabelText('What is the song about?'), 'a fallen soldier');
+    await userEvent.type(screen.getByLabelText('Lyrics'), 'Lay down the sword');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Auto length' }));
+    expect(screen.getByRole('slider', { name: /length/i })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: /make song/i }));
+    await vi.waitFor(() => expect(api.calls).toHaveLength(1));
+    expect(api.calls[0]!.body).toMatchObject({ input: { lyrics: 'Lay down the sword', lengthSeconds: 150 } });
+  });
+
+  it('a kie song with vocals and no lyrics keeps the slider off and says why', async () => {
+    renderForm();
+    await pickModel('V6');
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Auto length' }));
+    expect(screen.getByRole('slider', { name: /length/i })).toBeDisabled();
+    expect(screen.getByText(/kie\.ai keeps the length only when the song has lyrics/)).toBeInTheDocument();
   });
 
   it('lyrics typed before a model change stay', async () => {
