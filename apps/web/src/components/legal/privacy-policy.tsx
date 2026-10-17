@@ -59,9 +59,9 @@ export function PrivacyPolicy() {
 
       <LegalSection title="Services that process your data">
         <ul className="m-0 list-disc space-y-2 pl-[18px]">
-          <li>Minstrel runs the website, the API, and the database on its own server in the Philippines.</li>
-          <li>Cloudflare Tunnel carries each connection between your browser and that server.</li>
-          <li>Cloudflare R2 stores the song audio, the cover images, and the database backups.</li>
+          <li>A hosting service runs the website, the API, and the database.</li>
+          <li>A network service carries each connection between your browser and Minstrel.</li>
+          <li>A file storage service stores the song audio, the cover images, and the database backups.</li>
           <li>Google signs you in.</li>
         </ul>
         <p>
