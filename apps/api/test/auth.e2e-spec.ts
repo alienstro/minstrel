@@ -35,6 +35,18 @@ describe('auth (e2e)', () => {
     await t.app.close();
   });
 
+  it('the auth tables get UUID v7 ids from the database', async () => {
+    expect((await signUp(t, 'ada@example.com')).status).toBe(200);
+    expect((await verify(t)).status).toBe(302);
+    const db = t.app.get<Db>(DB);
+    const { rows } = await db.execute<{ id: string }>(
+      sql`SELECT id::text FROM "user" UNION ALL SELECT id::text FROM account UNION ALL SELECT id::text FROM session`,
+    );
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+    // The 13th hex digit of a UUID is its version.
+    for (const { id } of rows) expect(id[14]).toBe('7');
+  });
+
   it('GET /api/health returns 200 without a session', async () => {
     const res = await request(t.app.getHttpServer()).get('/api/health');
     expect(res.status).toBe(200);
