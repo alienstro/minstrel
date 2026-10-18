@@ -25,11 +25,18 @@ const DONE_COUNT: Record<GenerationStatus, number> = {
 
 export function TakesPanel({ generations }: { generations: GenerationDto[] }) {
   if (generations.length === 0) return <p className="mono mu m-0 text-[11px]">Your takes appear here.</p>;
+  // The list scrolls inside the panel, so the panel stays about as tall as the song form. At a wide
+  // width the list fills the height next to the form, and the absolute box keeps the list out of the
+  // row height. At a narrow width the list grows up to its maximum height. The padding keeps the focus
+  // ring (2 px at a 3 px offset) inside the scroll box. The box is positioned, so the absolute
+  // screen-reader text of the stages stays inside it and does not make the page taller.
   return (
-    <div className="flex flex-col gap-6">
-      {generations.map((g) => (
-        <TakeGroup key={g.id} initial={g} />
-      ))}
+    <div className="lg:relative lg:min-h-60 lg:grow">
+      <div className="relative -m-1.5 flex max-h-[min(480px,60dvh)] flex-col gap-6 overflow-y-auto overscroll-contain p-1.5 lg:absolute lg:inset-0 lg:max-h-none">
+        {generations.map((g) => (
+          <TakeGroup key={g.id} initial={g} />
+        ))}
+      </div>
     </div>
   );
 }
