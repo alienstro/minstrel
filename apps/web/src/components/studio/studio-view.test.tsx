@@ -1,5 +1,5 @@
 import type { ConnectionDto, GenerationDto, GenerationStatus, ProviderInfo, TrackDto } from '@minstrel/shared';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { PlayerProvider } from '@/components/player/player-context';
 import { fakeApi, renderWithQuery } from '@/test/render';
 import { StudioView } from './studio-view';
@@ -87,7 +87,7 @@ describe('StudioView', () => {
     expect(await within(takes).findByText('2 takes', {}, { timeout: 6000 })).toBeInTheDocument();
   }, 10_000);
 
-  it('the Takes panel shows each song in progress and only the 3 newest finished songs', async () => {
+  it('the Takes panel shows the 3 newest songs and each older song in progress', async () => {
     renderStudio([
       generation('g-1', 'complete', 'song one'),
       generation('g-2', 'pending', 'song two'),
@@ -102,8 +102,27 @@ describe('StudioView', () => {
       'song one',
       'song two',
       'song three',
-      'song four',
       'song six',
     ]);
   });
+
+  it('an older song leaves the Takes panel when the poll shows that it is ready', async () => {
+    const running = generation('g-4', 'running', 'song four');
+    renderStudio(
+      [
+        generation('g-1', 'complete', 'song one'),
+        generation('g-2', 'complete', 'song two'),
+        generation('g-3', 'complete', 'song three'),
+        running,
+      ],
+      [{ ...running, status: 'complete', tracks: [track('t-1', 'g-4')] }],
+    );
+    const takes = await screen.findByRole('region', { name: 'Takes' });
+    expect(await within(takes).findByRole('article', { name: 'song four' })).toBeInTheDocument();
+    // The first poll comes after POLL_MS (3 s).
+    await waitFor(() => expect(within(takes).queryByRole('article', { name: 'song four' })).not.toBeInTheDocument(), {
+      timeout: 6000,
+    });
+    expect(within(takes).getAllByRole('article')).toHaveLength(3);
+  }, 10_000);
 });

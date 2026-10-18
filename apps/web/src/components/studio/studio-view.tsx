@@ -20,16 +20,22 @@ const recentGenerationsQuery = {
   staleTime: Infinity,
 };
 
-// The panel is not a second Library, so it keeps only the newest finished songs.
-const FINISHED_TAKES = 3;
+// The panel is not a second Library, so it shows only the newest songs.
+const SHOWN_SONGS = 3;
 
-function takesToShow(created: GenerationDto[], recent: GenerationDto[]): GenerationDto[] {
+// The songs that can show: each song of this visit, each song in progress, and the newest finished songs.
+function takesToWatch(created: GenerationDto[], recent: GenerationDto[]): GenerationDto[] {
   const createdIds = new Set(created.map((g) => g.id));
   let finished = 0;
   const seeded = recent.filter(
-    (g) => !createdIds.has(g.id) && (!isFinished(g.status) || finished++ < FINISHED_TAKES),
+    (g) => !createdIds.has(g.id) && (!isFinished(g.status) || finished++ < SHOWN_SONGS),
   );
   return [...created, ...seeded];
+}
+
+// The panel shows the 3 newest songs. An older song stays until it is ready, so its stages stay in view.
+function takesToShow(songs: GenerationDto[]): GenerationDto[] {
+  return songs.filter((g, i) => i < SHOWN_SONGS || !isFinished(g.status));
 }
 
 export function StudioView() {
@@ -48,10 +54,12 @@ export function StudioView() {
   const recent = useQuery(recentGenerationsQuery);
   const [created, setCreated] = useState<GenerationDto[]>([]);
   const { playing } = usePlayer();
-  const takes = takesToShow(created, recent.data?.items ?? []);
-  // The count reads the same polled rows as the Takes panel, so it grows as the takes arrive.
-  const live = useQueries({ queries: takes.map((g) => generationQueryOptions(g.id, g)) });
-  const trackCount = takes.reduce((n, g, i) => n + (live[i]?.data ?? g).tracks.length, 0);
+  const watched = takesToWatch(created, recent.data?.items ?? []);
+  // The panel and the count read the polled rows. A song of this visit keeps its submit status in
+  // `created`, so only the poll tells when it is ready.
+  const live = useQueries({ queries: watched.map((g) => generationQueryOptions(g.id, g)) });
+  const takes = takesToShow(watched.map((g, i) => live[i]?.data ?? g));
+  const trackCount = takes.reduce((n, g) => n + g.tracks.length, 0);
 
   if (connections.isPending || providers.isPending || modelQueries.some((q) => q.isPending)) {
     return <p className="mono mu text-center text-[11px]">Loading…</p>;
@@ -81,7 +89,7 @@ export function StudioView() {
           onCreated={(g) => setCreated((list) => [g, ...list])}
         />
       </div>
-      <section aria-label="Takes" className="flex min-w-0 flex-[1_1_320px] flex-col gap-4">
+      <section aria-label="Takes" className="flex min-w-0 flex-[1_1_320px] flex-col gap-4 self-stretch">
         {/* The record spins while a song plays. */}
         <div className="relative h-[216px] w-[300px] self-center" aria-hidden="true">
           <span className="disc absolute top-2 left-[92px] size-[200px]" data-paused={!playing} />

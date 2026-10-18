@@ -14,7 +14,7 @@ The CC0 photos do not require a credit, but a credit is good practice.
 
 | Canvas class | Song or place | Title | Creator | License | Source |
 |---|---|---|---|---|---|
-| `i1` | The Cat Who Sailed | Blue fishing boat harbour Eretria Euboea Greece | Jebulon | CC0 1.0 | https://commons.wikimedia.org/w/index.php?curid=51505686 |
+| `i1` | Figuring Out | Blue fishing boat harbour Eretria Euboea Greece | Jebulon | CC0 1.0 | https://commons.wikimedia.org/w/index.php?curid=51505686 |
 | `i2` | Lantern Over Dunmoor | Flame and light | eskel_kreig | CC BY 2.0 | https://www.flickr.com/photos/130154986@N04/27962766846 |
 | `i3` | Weld and Woad | violin | firepile | CC BY 2.0 | https://www.flickr.com/photos/17643132@N00/30517837 |
 | `i4` | Salt on the Tollgate | Sea wave | kewl | CC BY 2.0 | https://www.flickr.com/photos/58411470@N00/8763362960 |
