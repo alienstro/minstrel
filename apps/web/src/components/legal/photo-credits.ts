@@ -11,7 +11,7 @@ export interface PhotoCredit {
 }
 
 export const PHOTO_CREDITS: PhotoCredit[] = [
-  { img: 'i1', song: 'The Cat Who Sailed', creator: 'Jebulon', license: 'CC0 1.0', source: 'https://commons.wikimedia.org/w/index.php?curid=51505686' },
+  { img: 'i1', song: 'Figuring Out', creator: 'Jebulon', license: 'CC0 1.0', source: 'https://commons.wikimedia.org/w/index.php?curid=51505686' },
   { img: 'i2', song: 'Lantern Over Dunmoor', creator: 'eskel_kreig', license: 'CC BY 2.0', source: 'https://www.flickr.com/photos/130154986@N04/27962766846' },
   { img: 'i3', song: 'Weld and Woad', creator: 'firepile', license: 'CC BY 2.0', source: 'https://www.flickr.com/photos/17643132@N00/30517837' },
   { img: 'i4', song: 'Salt on the Tollgate', creator: 'kewl', license: 'CC BY 2.0', source: 'https://www.flickr.com/photos/58411470@N00/8763362960' },
